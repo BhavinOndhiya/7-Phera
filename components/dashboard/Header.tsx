@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, Bell, ChevronDown, LogOut, User as UserIcon, Settings } from 'lucide-react';
+import { Menu, Bell, ChevronDown, User as UserIcon, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,9 +22,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sidebar } from './Sidebar';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { SignOutMenuItem } from './SignOutMenuItem';
 import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 import { getInitials } from '@/lib/utils/formatting';
-import { logoutAction } from '@/app/(auth)/actions';
 import type { UserProfile } from '@/lib/types/database.types';
 
 interface HeaderProps {
@@ -101,13 +101,7 @@ export function Header({ profile, email }: HeaderProps) {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <form action={logoutAction}>
-              <button type="submit" className="w-full">
-                <DropdownMenuItem className="text-destructive cursor-pointer">
-                  <LogOut className="h-4 w-4 mr-2" /> Sign out
-                </DropdownMenuItem>
-              </button>
-            </form>
+            <SignOutMenuItem />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

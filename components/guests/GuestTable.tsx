@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   Plus,
   Search,
@@ -11,6 +12,9 @@ import {
   MoreVertical,
   Filter,
   Users,
+  UserMinus,
+  UserPlus,
+  CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -41,11 +45,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { GuestForm } from './GuestForm';
 import { GuestQRCard } from './GuestQRCard';
+import { AddExistingGuestsDialog } from './AddExistingGuestsDialog';
 import { useGuests } from '@/lib/hooks/useGuests';
+import { useEvents } from '@/lib/hooks/useEvents';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { RSVP_STATUSES, SIDES } from '@/lib/constants';
 import type { Guest, Side, RsvpStatus } from '@/lib/types/database.types';
@@ -58,7 +65,15 @@ interface GuestTableProps {
 }
 
 export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
-  const { guests, loading, updateRsvp, deleteGuest } = useGuests({ eventId });
+  const {
+    guests,
+    guestEvents,
+    loading,
+    updateRsvp,
+    deleteGuest,
+    removeFromEvent,
+  } = useGuests({ eventId });
+  const { events } = useEvents();
   const { can } = useWorkspace();
   const canEdit = can('edit_guest');
   const canDelete = can('delete_guest');
@@ -66,9 +81,17 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const [search, setSearch] = useState('');
   const [sideFilter, setSideFilter] = useState<Side | 'all'>('all');
   const [rsvpFilter, setRsvpFilter] = useState<RsvpStatus | 'all'>('all');
+  const [eventFilter, setEventFilter] = useState<string>('all');
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [addExistingOpen, setAddExistingOpen] = useState(false);
+
+  const eventsById = useMemo(() => {
+    const m: Record<string, { id: string; name: string }> = {};
+    for (const e of events) m[e.id] = { id: e.id, name: e.name };
+    return m;
+  }, [events]);
 
   const filtered = useMemo(() => {
     return guests.filter((g) => {
@@ -80,14 +103,22 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
         g.email?.toLowerCase().includes(search.toLowerCase());
       const matchesSide = sideFilter === 'all' || g.side === sideFilter;
       const matchesRsvp = rsvpFilter === 'all' || g.rsvp_status === rsvpFilter;
-      return matchesSearch && matchesSide && matchesRsvp;
+      const matchesEvent =
+        eventId ||
+        eventFilter === 'all' ||
+        (eventFilter === 'none'
+          ? !(guestEvents[g.id] && guestEvents[g.id].length > 0)
+          : (guestEvents[g.id] ?? []).includes(eventFilter));
+      return matchesSearch && matchesSide && matchesRsvp && matchesEvent;
     });
-  }, [guests, search, sideFilter, rsvpFilter]);
+  }, [guests, search, sideFilter, rsvpFilter, eventFilter, eventId, guestEvents]);
 
   async function onRsvpChange(id: string, value: RsvpStatus) {
     const ok = await updateRsvp(id, value);
     if (ok) toast.success('RSVP updated');
   }
+
+  const showEventsColumn = !eventId && events.length > 0;
 
   return (
     <div className="space-y-4">
@@ -115,6 +146,14 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 ml-auto">
+          {eventId && canCreate && (
+            <Button
+              variant="outline"
+              onClick={() => setAddExistingOpen(true)}
+            >
+              <UserPlus className="h-4 w-4 mr-2" /> Invite existing
+            </Button>
+          )}
           {canCreate && (
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               Import CSV
@@ -171,6 +210,23 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             ))}
           </SelectContent>
         </Select>
+        {!eventId && events.length > 0 && (
+          <Select value={eventFilter} onValueChange={setEventFilter}>
+            <SelectTrigger className="w-[200px]">
+              <CalendarDays className="h-3 w-3 mr-1.5 opacity-50" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All events</SelectItem>
+              <SelectItem value="none">Not invited to any</SelectItem>
+              {events.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="rounded-xl border bg-card overflow-hidden">
@@ -180,6 +236,9 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
               <TableHead>Name</TableHead>
               <TableHead>Side</TableHead>
               <TableHead className="hidden md:table-cell">Relation</TableHead>
+              {showEventsColumn && (
+                <TableHead className="hidden md:table-cell">Invited to</TableHead>
+              )}
               <TableHead className="hidden lg:table-cell">Contact</TableHead>
               <TableHead>RSVP</TableHead>
               <TableHead className="w-[60px]"></TableHead>
@@ -188,128 +247,182 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell
+                  colSpan={showEventsColumn ? 7 : 6}
+                  className="text-center py-12 text-muted-foreground"
+                >
                   Loading guests…
                 </TableCell>
               </TableRow>
             )}
             {!loading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell
+                  colSpan={showEventsColumn ? 7 : 6}
+                  className="text-center py-12 text-muted-foreground"
+                >
                   {guests.length === 0
-                    ? 'No guests yet. Add your first guest or import a CSV.'
+                    ? eventId
+                      ? 'No one invited yet. Add a new guest or invite from your existing list.'
+                      : 'No guests yet. Add your first guest or import a CSV.'
                     : 'No guests match your filters.'}
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((guest) => (
-              <TableRow key={guest.id}>
-                <TableCell>
-                  <div className="font-medium flex items-center gap-1.5">
-                    {guest.full_name}
-                    {guest.party_size > 1 && (
-                      <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 text-xs">
-                        <Users className="h-3 w-3 mr-1" /> {guest.party_size}
-                      </Badge>
+            {filtered.map((guest) => {
+              const invitedEventIds = guestEvents[guest.id] ?? [];
+              return (
+                <TableRow key={guest.id}>
+                  <TableCell>
+                    <div className="font-medium flex items-center gap-1.5">
+                      {guest.full_name}
+                      {guest.party_size > 1 && (
+                        <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 text-xs">
+                          <Users className="h-3 w-3 mr-1" /> {guest.party_size}
+                        </Badge>
+                      )}
+                    </div>
+                    {guest.plus_one && (
+                      <span className="text-xs text-muted-foreground">+1</span>
                     )}
-                  </div>
-                  {guest.plus_one && (
-                    <span className="text-xs text-muted-foreground">+1</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="capitalize">
-                    {guest.side}
-                  </Badge>
-                </TableCell>
-                <TableCell className="hidden md:table-cell text-muted-foreground">
-                  {guest.relation}
-                </TableCell>
-                <TableCell className="hidden lg:table-cell">
-                  <div className="space-y-0.5 text-xs">
-                    {guest.phone && (
-                      <a
-                        href={`tel:${guest.phone}`}
-                        className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                      >
-                        <Phone className="h-3 w-3" />
-                        {guest.phone}
-                      </a>
-                    )}
-                    {guest.email && (
-                      <a
-                        href={`mailto:${guest.email}`}
-                        className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                      >
-                        <Mail className="h-3 w-3" />
-                        <span className="truncate max-w-[180px]">{guest.email}</span>
-                      </a>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Select
-                    value={guest.rsvp_status}
-                    onValueChange={(v) => onRsvpChange(guest.id, v as RsvpStatus)}
-                    disabled={!canEdit}
-                  >
-                    <SelectTrigger className="h-8 w-[120px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RSVP_STATUSES.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1 justify-end">
-                    {eventId && (
-                      <GuestQRCard
-                        guest={guest}
-                        eventId={eventId}
-                        eventName={eventName}
-                      />
-                    )}
-                    {(canEdit || canDelete) && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canEdit && (
-                            <DropdownMenuItem onClick={() => setEditingGuest(guest)}>
-                              <Edit className="h-4 w-4 mr-2" /> Edit
-                            </DropdownMenuItem>
-                          )}
-                          {canDelete && (
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={async () => {
-                                if (
-                                  confirm(
-                                    `Remove ${guest.full_name} from your guest list?`
-                                  )
-                                ) {
-                                  await deleteGuest(guest.id);
-                                }
-                              }}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="capitalize">
+                      {guest.side}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    {guest.relation}
+                  </TableCell>
+                  {showEventsColumn && (
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                        {invitedEventIds.length === 0 && (
+                          <span className="text-xs text-muted-foreground italic">
+                            Not invited yet
+                          </span>
+                        )}
+                        {invitedEventIds.map((eid) => {
+                          const evt = eventsById[eid];
+                          if (!evt) return null;
+                          return (
+                            <Link
+                              key={eid}
+                              href={`/events/${eid}/guests`}
+                              className="inline-flex items-center"
                             >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] hover:bg-rose-50 hover:border-rose-200 cursor-pointer"
+                              >
+                                {evt.name}
+                              </Badge>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </TableCell>
+                  )}
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="space-y-0.5 text-xs">
+                      {guest.phone && (
+                        <a
+                          href={`tel:${guest.phone}`}
+                          className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <Phone className="h-3 w-3" />
+                          {guest.phone}
+                        </a>
+                      )}
+                      {guest.email && (
+                        <a
+                          href={`mailto:${guest.email}`}
+                          className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <Mail className="h-3 w-3" />
+                          <span className="truncate max-w-[180px]">{guest.email}</span>
+                        </a>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={guest.rsvp_status}
+                      onValueChange={(v) => onRsvpChange(guest.id, v as RsvpStatus)}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="h-8 w-[120px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RSVP_STATUSES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>
+                            {s.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 justify-end">
+                      {eventId && (
+                        <GuestQRCard
+                          guest={guest}
+                          eventId={eventId}
+                          eventName={eventName}
+                        />
+                      )}
+                      {(canEdit || canDelete) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {canEdit && (
+                              <DropdownMenuItem onClick={() => setEditingGuest(guest)}>
+                                <Edit className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && eventId && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    await removeFromEvent(guest.id, eventId);
+                                  }}
+                                >
+                                  <UserMinus className="h-4 w-4 mr-2" /> Remove from
+                                  this event
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={async () => {
+                                  if (
+                                    confirm(
+                                      `Delete ${guest.full_name} from your workspace? This removes them from every event.`
+                                    )
+                                  ) {
+                                    await deleteGuest(guest.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete from
+                                workspace
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -351,6 +464,14 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
           <GuestImport eventId={eventId} onDone={() => setImportOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      {eventId && (
+        <AddExistingGuestsDialog
+          eventId={eventId}
+          open={addExistingOpen}
+          onOpenChange={setAddExistingOpen}
+        />
+      )}
     </div>
   );
 }
