@@ -28,11 +28,16 @@ import { VendorForm } from '@/components/vendors/VendorForm';
 import { VendorComparison } from '@/components/vendors/VendorComparison';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useVendors } from '@/lib/hooks/useVendors';
+import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { VENDOR_CATEGORIES } from '@/lib/constants';
 import type { Vendor } from '@/lib/types/database.types';
 
 export default function VendorsPage() {
   const { vendors, loading, deleteVendor } = useVendors();
+  const { can } = useWorkspace();
+  const canCreate = can('create_vendor');
+  const canEdit = can('edit_vendor');
+  const canDelete = can('delete_vendor');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [addOpen, setAddOpen] = useState(false);
@@ -89,12 +94,14 @@ export default function VendorsPage() {
               Compare ({compareList.length})
             </Button>
           )}
-          <Button
-            className="bg-rose-500 hover:bg-rose-600"
-            onClick={() => setAddOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" /> Add vendor
-          </Button>
+          {canCreate && (
+            <Button
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add vendor
+            </Button>
+          )}
         </div>
       </div>
 
@@ -140,7 +147,7 @@ export default function VendorsPage() {
               : 'Try a different search or filter.'
           }
           action={
-            vendors.length === 0 ? (
+            vendors.length === 0 && canCreate ? (
               <Button
                 className="bg-rose-500 hover:bg-rose-600"
                 onClick={() => setAddOpen(true)}
@@ -158,8 +165,8 @@ export default function VendorsPage() {
             <VendorCard
               key={vendor.id}
               vendor={vendor}
-              onEdit={setEditing}
-              onDelete={onDelete}
+              onEdit={canEdit ? setEditing : undefined}
+              onDelete={canDelete ? onDelete : undefined}
               onCompareToggle={toggleCompare}
               isComparing={Boolean(
                 compareList.find((v) => v.id === vendor.id)

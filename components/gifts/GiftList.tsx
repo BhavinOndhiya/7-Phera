@@ -22,11 +22,16 @@ import {
 import { EmptyState } from '@/components/shared/EmptyState';
 import { GiftForm } from './GiftForm';
 import { useGifts } from '@/lib/hooks/useGifts';
+import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatINR } from '@/lib/utils/formatting';
 import type { Gift } from '@/lib/types/database.types';
 
 export function GiftList({ eventId }: { eventId: string }) {
   const { gifts, loading, deleteGift, toggleClaim } = useGifts(eventId);
+  const { can } = useWorkspace();
+  const canEdit = can('edit_budget');
+  const canDelete = can('delete_budget');
+  const canCreate = can('create_budget');
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Gift | null>(null);
 
@@ -36,12 +41,14 @@ export function GiftList({ eventId }: { eventId: string }) {
         <h2 className="font-serif text-xl font-semibold">
           {gifts.length} {gifts.length === 1 ? 'item' : 'items'}
         </h2>
-        <Button
-          className="bg-rose-500 hover:bg-rose-600"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" /> Add gift
-        </Button>
+        {canCreate && (
+          <Button
+            className="bg-rose-500 hover:bg-rose-600"
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Add gift
+          </Button>
+        )}
       </div>
 
       {loading && (
@@ -128,26 +135,30 @@ export function GiftList({ eventId }: { eventId: string }) {
                       {claimed ? 'Unclaim' : 'Claim'}
                     </Button>
                     <div className="flex-1" />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setEditing(gift)}
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={async () => {
-                        if (confirm(`Remove ${gift.name}?`)) {
-                          await deleteGift(gift.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setEditing(gift)}
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        onClick={async () => {
+                          if (confirm(`Remove ${gift.name}?`)) {
+                            await deleteGift(gift.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

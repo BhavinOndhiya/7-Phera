@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type { Gift, InsertTables, UpdateTables } from '@/lib/types/database.types';
 
 export function useGifts(eventId?: string) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,9 +42,13 @@ export function useGifts(eventId?: string) {
   }, [supabase, refresh, eventId]);
 
   async function createGift(input: InsertTables<'gifts'>) {
+    if (!workspaceId) {
+      toast.error('Pick a workspace first');
+      return null;
+    }
     const { data, error } = await supabase
       .from('gifts')
-      .insert(input)
+      .insert({ ...input, workspace_id: workspaceId })
       .select()
       .single();
     if (error) {

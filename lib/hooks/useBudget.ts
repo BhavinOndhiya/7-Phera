@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   BudgetItem,
   BudgetCategory,
@@ -14,15 +15,40 @@ import type {
 
 export function useBudget(eventId?: string) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
-    const itemsQuery = eventId
-      ? supabase.from('budget_items').select('*').eq('event_id', eventId)
-      : supabase.from('budget_items').select('*');
+    if (!workspaceId && !eventId) {
+      setBudgetItems([]);
+      setCategories([]);
+      setVendors([]);
+      setLoading(false);
+      return;
+    }
+    let itemsQuery;
+    if (eventId) {
+      itemsQuery = supabase.from('budget_items').select('*').eq('event_id', eventId);
+    } else if (workspaceId) {
+      itemsQuery = supabase
+        .from('budget_items')
+        .select('*')
+        .eq('workspace_id', workspaceId);
+    } else {
+      itemsQuery = supabase.from('budget_items').select('*').eq('id', '__none__');
+    }
+
+    const vendorsQuery = workspaceId
+      ? supabase
+          .from('vendors')
+          .select('*')
+          .eq('workspace_id', workspaceId)
+          .order('name')
+      : supabase.from('vendors').select('*').order('name');
 
     const [itemsResult, catResult, vendorResult] = await Promise.all([
       itemsQuery,
@@ -30,7 +56,7 @@ export function useBudget(eventId?: string) {
         .from('budget_categories')
         .select('*')
         .order('sort_order'),
-      supabase.from('vendors').select('*').order('name'),
+      vendorsQuery,
     ]);
 
     if (itemsResult.error) toast.error(itemsResult.error.message);
@@ -43,7 +69,7 @@ export function useBudget(eventId?: string) {
     else setVendors(vendorResult.data ?? []);
 
     setLoading(false);
-  }, [supabase, eventId]);
+  }, [supabase, eventId, workspaceId]);
 
   useEffect(() => {
     fetchAll();
@@ -66,9 +92,13 @@ export function useBudget(eventId?: string) {
   }, [supabase, fetchAll]);
 
   async function addItem(item: InsertTables<'budget_items'>) {
+    if (!workspaceId) {
+      toast.error('Pick a workspace first');
+      return null;
+    }
     const { data, error } = await supabase
       .from('budget_items')
-      .insert(item)
+      .insert({ ...item, workspace_id: workspaceId })
       .select()
       .single();
     if (error) {
@@ -121,6 +151,7 @@ export function useBudget(eventId?: string) {
     categories,
     vendors,
     loading,
+    workspaceId,
     addItem,
     updateItem,
     deleteItem,

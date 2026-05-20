@@ -14,14 +14,25 @@ const PROTECTED_PREFIXES = [
   '/gallery',
   '/gifts',
   '/settings',
+  '/onboarding',
+  '/admin',
 ];
 
 const AUTH_PREFIXES = ['/login', '/signup', '/forgot-password'];
+
+function withPathHeader(request: NextRequest, response: NextResponse) {
+  response.headers.set('x-pathname', request.nextUrl.pathname);
+  return response;
+}
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isProtectedRoute = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
   const isAuthRoute = AUTH_PREFIXES.some((p) => pathname.startsWith(p));
+  const isAdminRoute = pathname.startsWith('/admin');
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', pathname);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -33,10 +44,13 @@ export async function updateSession(request: NextRequest) {
       url.searchParams.set('reason', 'unconfigured');
       return NextResponse.redirect(url);
     }
-    return NextResponse.next({ request });
+    return withPathHeader(
+      request,
+      NextResponse.next({ request: { headers: requestHeaders } })
+    );
   }
 
-  let response = NextResponse.next({ request });
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   try {
     const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -48,7 +62,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -73,9 +87,28 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    return response;
+    if (user && isAdminRoute) {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('is_superadmin, is_suspended')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (profile?.is_suspended) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        url.searchParams.set('message', 'Your account has been suspended');
+        return NextResponse.redirect(url);
+      }
+      if (!profile?.is_superadmin) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/dashboard';
+        return NextResponse.redirect(url);
+      }
+    }
+
+    return withPathHeader(request, response);
   } catch (error) {
     console.error('[middleware] Supabase session error:', error);
-    return response;
+    return withPathHeader(request, response);
   }
 }

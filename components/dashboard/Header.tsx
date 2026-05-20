@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sidebar } from './Sidebar';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 import { getInitials } from '@/lib/utils/formatting';
 import { logoutAction } from '@/app/(auth)/actions';
@@ -51,9 +52,10 @@ export function Header({ profile, email }: HeaderProps) {
             <Sidebar onNavigate={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
-        <h1 className="font-serif text-lg font-semibold text-foreground hidden sm:block">
+        <h1 className="font-serif text-lg font-semibold text-foreground hidden xl:block">
           Welcome{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
         </h1>
+        <WorkspaceSwitcher />
       </div>
 
       <div className="flex items-center gap-2">

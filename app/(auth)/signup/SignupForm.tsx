@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, Mail, Lock, User, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,9 @@ const ROLES = [
 
 export function SignupForm() {
   const router = useRouter();
+  const search = useSearchParams();
+  const inviteToken = search.get('invite');
+  const prefilledEmail = search.get('email');
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<string>('bride');
@@ -25,6 +28,7 @@ export function SignupForm() {
   function onSubmit(formData: FormData) {
     setError(null);
     formData.set('role', role);
+    if (inviteToken) formData.set('invite_token', inviteToken);
     startTransition(async () => {
       const result = await signupAction(formData);
       if (!result.ok) {
@@ -40,6 +44,13 @@ export function SignupForm() {
 
   return (
     <form action={onSubmit} className="space-y-4">
+      {inviteToken && (
+        <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose-900">
+          You&apos;re signing up to accept an invitation. You&apos;ll be added to the
+          workspace after creating your account.
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="full_name">Full name</Label>
         <div className="relative">
@@ -66,6 +77,8 @@ export function SignupForm() {
             placeholder="you@example.com"
             required
             autoComplete="email"
+            defaultValue={prefilledEmail ?? undefined}
+            readOnly={!!prefilledEmail}
             className="pl-9"
           />
         </div>

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { ThemePicker } from './ThemePicker';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import { EVENT_TYPES } from '@/lib/constants';
 import { eventSchema } from '@/lib/utils/validation';
 import type { Event, EventType } from '@/lib/types/database.types';
@@ -29,6 +30,8 @@ interface EventFormProps {
 export function EventForm({ initial, onCancel }: EventFormProps) {
   const router = useRouter();
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [isPending, startTransition] = useTransition();
 
   const [form, setForm] = useState({
@@ -61,7 +64,13 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      const payload = {
+
+      if (!initial && !workspaceId) {
+        toast.error('Pick a workspace first');
+        return;
+      }
+
+      const basePayload = {
         name: parsed.data.name,
         event_type: parsed.data.event_type,
         event_date: parsed.data.event_date,
@@ -72,13 +81,12 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
         theme_name: form.theme_name,
         theme_colors: form.theme_colors,
         theme_description: form.theme_description,
-        created_by: user?.id ?? null,
       };
 
       if (initial) {
         const { error } = await supabase
           .from('events')
-          .update(payload)
+          .update(basePayload)
           .eq('id', initial.id);
         if (error) {
           toast.error(error.message);
@@ -90,7 +98,11 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
       } else {
         const { data, error } = await supabase
           .from('events')
-          .insert(payload)
+          .insert({
+            ...basePayload,
+            created_by: user?.id ?? null,
+            workspace_id: workspaceId,
+          })
           .select()
           .single();
         if (error) {

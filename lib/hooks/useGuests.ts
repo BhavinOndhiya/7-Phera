@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   Guest,
   InsertTables,
@@ -15,6 +16,8 @@ interface UseGuestsOptions {
 
 export function useGuests({ eventId }: UseGuestsOptions = {}) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,15 +46,21 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       if (error) toast.error(`Failed to load guests: ${error.message}`);
       else setGuests(data ?? []);
     } else {
+      if (!workspaceId) {
+        setGuests([]);
+        setLoading(false);
+        return;
+      }
       const { data, error } = await supabase
         .from('guests')
         .select('*')
+        .eq('workspace_id', workspaceId)
         .order('full_name');
       if (error) toast.error(`Failed to load guests: ${error.message}`);
       else setGuests(data ?? []);
     }
     setLoading(false);
-  }, [supabase, eventId]);
+  }, [supabase, eventId, workspaceId]);
 
   useEffect(() => {
     fetchGuests();
@@ -77,9 +86,13 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
     guest: InsertTables<'guests'>,
     options?: { eventId?: string }
   ) {
+    if (!workspaceId) {
+      toast.error('Pick a workspace first');
+      return null;
+    }
     const { data, error } = await supabase
       .from('guests')
-      .insert(guest)
+      .insert({ ...guest, workspace_id: workspaceId })
       .select()
       .single();
     if (error) {
@@ -133,6 +146,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
   return {
     guests,
     loading,
+    workspaceId,
     addGuest,
     updateGuest,
     deleteGuest,

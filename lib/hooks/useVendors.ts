@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   Vendor,
   InsertTables,
@@ -11,18 +12,26 @@ import type {
 
 export function useVendors() {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchVendors = useCallback(async () => {
+    if (!workspaceId) {
+      setVendors([]);
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from('vendors')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .order('name');
     if (error) toast.error(`Failed to load vendors: ${error.message}`);
     else setVendors(data ?? []);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     fetchVendors();
@@ -40,9 +49,13 @@ export function useVendors() {
   }, [supabase, fetchVendors]);
 
   async function addVendor(vendor: InsertTables<'vendors'>) {
+    if (!workspaceId) {
+      toast.error('Pick a workspace first');
+      return null;
+    }
     const { data, error } = await supabase
       .from('vendors')
-      .insert(vendor)
+      .insert({ ...vendor, workspace_id: workspaceId })
       .select()
       .single();
     if (error) {
@@ -79,6 +92,7 @@ export function useVendors() {
   return {
     vendors,
     loading,
+    workspaceId,
     addVendor,
     updateVendor,
     deleteVendor,

@@ -2,12 +2,71 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { loginSchema, signupSchema } from '@/lib/utils/validation';
 
 export type ActionResult =
   | { ok: true; redirectTo?: string }
   | { ok: false; error: string };
+
+function parseSuperadminEmails(): Set<string> {
+  return new Set(
+    (process.env.SUPERADMIN_EMAILS ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Ensure user has at least one workspace; create personal one if not.
+ * Also seeds is_superadmin from SUPERADMIN_EMAILS env var (idempotent).
+ * Uses the service role so it works even before email confirmation.
+ */
+async function bootstrapUser(opts: {
+  userId: string;
+  email: string;
+  fullName: string;
+}) {
+  const admin = createServiceRoleClient();
+
+  const superadminEmails = parseSuperadminEmails();
+  if (superadminEmails.has(opts.email.toLowerCase())) {
+    await admin
+      .from('users')
+      .update({ is_superadmin: true })
+      .eq('id', opts.userId);
+  }
+
+  const { data: existing } = await admin
+    .from('workspace_members')
+    .select('workspace_id')
+    .eq('user_id', opts.userId)
+    .limit(1);
+
+  if (existing && existing.length > 0) return;
+
+  const { data: ws, error: wsErr } = await admin
+    .from('workspaces')
+    .insert({
+      name: `${opts.fullName || 'My'}'s Wedding`,
+      created_by: opts.userId,
+    })
+    .select('id')
+    .single();
+
+  if (wsErr || !ws) {
+    console.error('[bootstrapUser] workspace create failed', wsErr);
+    return;
+  }
+
+  await admin.from('workspace_members').insert({
+    workspace_id: ws.id,
+    user_id: opts.userId,
+    role: 'owner',
+    invited_by: opts.userId,
+  });
+}
 
 export async function loginAction(formData: FormData): Promise<ActionResult> {
   const parsed = loginSchema.safeParse({
@@ -20,10 +79,24 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
   }
 
   const supabase = createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+
+  if (data.user) {
+    try {
+      await bootstrapUser({
+        userId: data.user.id,
+        email: data.user.email ?? parsed.data.email,
+        fullName:
+          (data.user.user_metadata?.full_name as string | undefined) ??
+          parsed.data.email.split('@')[0],
+      });
+    } catch (e) {
+      console.error('[loginAction] bootstrap failed', e);
+    }
   }
 
   revalidatePath('/', 'layout');
@@ -31,6 +104,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
 }
 
 export async function signupAction(formData: FormData): Promise<ActionResult> {
+  const inviteToken = String(formData.get('invite_token') ?? '').trim() || null;
   const parsed = signupSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
@@ -60,14 +134,34 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: error.message };
   }
 
+  if (data.user) {
+    try {
+      await bootstrapUser({
+        userId: data.user.id,
+        email: parsed.data.email,
+        fullName: parsed.data.full_name,
+      });
+    } catch (e) {
+      console.error('[signupAction] bootstrap failed', e);
+    }
+  }
+
   if (data.session) {
     revalidatePath('/', 'layout');
+    if (inviteToken) {
+      return { ok: true, redirectTo: `/invite/accept?token=${inviteToken}` };
+    }
     return { ok: true, redirectTo: '/dashboard' };
   }
 
+  const confirmMsg =
+    'Check your email to confirm your account' +
+    (inviteToken ? ', then revisit the invite link' : '');
   return {
     ok: true,
-    redirectTo: '/login?message=Check your email to confirm your account',
+    redirectTo: `/login?message=${encodeURIComponent(confirmMsg)}${
+      inviteToken ? `&invite=${inviteToken}` : ''
+    }`,
   };
 }
 

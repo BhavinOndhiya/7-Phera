@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   DocumentRow,
   DocumentCategory,
@@ -13,10 +14,17 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export function useDocuments(eventId?: string) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchDocs = useCallback(async () => {
+    if (!eventId && !workspaceId) {
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
     const query = eventId
       ? supabase
           .from('documents')
@@ -26,12 +34,13 @@ export function useDocuments(eventId?: string) {
       : supabase
           .from('documents')
           .select('*')
+          .eq('workspace_id', workspaceId!)
           .order('created_at', { ascending: false });
     const { data, error } = await query;
     if (error) toast.error(error.message);
     else setDocuments(data ?? []);
     setLoading(false);
-  }, [supabase, eventId]);
+  }, [supabase, eventId, workspaceId]);
 
   useEffect(() => {
     fetchDocs();
@@ -86,6 +95,7 @@ export function useDocuments(eventId?: string) {
         file_size: file.size,
         category: options.category,
         uploaded_by: user?.id ?? null,
+        workspace_id: workspaceId,
       })
       .select()
       .single();

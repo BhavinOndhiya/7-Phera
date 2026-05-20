@@ -107,12 +107,14 @@ RAZORPAY_KEY_ID=rzp_test_xxx            # payments
 RAZORPAY_KEY_SECRET=xxx
 ```
 
-### 4. Run the database migration
+### 4. Run the database migrations
 
-In Supabase Studio → **SQL Editor**, paste the contents of:
+In Supabase Studio → **SQL Editor**, paste the contents of each file in order:
 
-- [`supabase/migrations/0001_initial_schema.sql`](supabase/migrations/0001_initial_schema.sql) — 14 tables, RLS policies, indexes, triggers, seed budget categories
-- [`supabase/storage_setup.sql`](supabase/storage_setup.sql) — storage buckets (`event-documents`, `event-photos`, `avatars`, `contracts`) and their RLS policies
+1. [`supabase/migrations/0001_initial_schema.sql`](supabase/migrations/0001_initial_schema.sql) — 14 tables, indexes, triggers, seed budget categories
+2. [`supabase/storage_setup.sql`](supabase/storage_setup.sql) — storage buckets (`event-documents`, `event-photos`, `avatars`, `contracts`) and their RLS policies
+3. [`supabase/migrations/0002_party_size.sql`](supabase/migrations/0002_party_size.sql) — adds `party_size` to guests so a single row can represent a whole family / group invitation
+4. [`supabase/migrations/0003_workspaces_and_rls.sql`](supabase/migrations/0003_workspaces_and_rls.sql) — **multi-tenant migration**: creates `workspaces`, `workspace_members`, `workspace_invitations`, `admin_audit_log` tables, adds `is_superadmin` / `is_suspended` columns on `users`, adds `workspace_id` columns to every scoped table, installs SQL helper functions (`is_superadmin()`, `can_view_workspace()`, `can_edit_workspace()`, `can_admin_workspace()`), replaces the blanket RLS with workspace-scoped policies, and backfills existing data from `events.created_by`
 
 Click **Run** for each file.
 
@@ -222,6 +224,41 @@ In Supabase Auth → **URL Configuration**:
 | `OPENAI_API_KEY` | optional | AI budget recommendations |
 | `RAZORPAY_KEY_ID` | optional | Razorpay order creation |
 | `RAZORPAY_KEY_SECRET` | optional | Razorpay signature verification |
+| `SUPERADMIN_EMAILS` | optional | Comma-separated emails that get auto-promoted to `is_superadmin = true` on next login. Bootstraps the first admin. |
+
+---
+
+## Multi-tenant roles and Superadmin
+
+The app is multi-tenant: each wedding lives in its own **workspace**, and every event / guest / budget / vendor / task belongs to exactly one workspace.
+
+### Workspace roles
+
+| Role | Can do |
+|---|---|
+| **Owner** (bride / groom) | Everything inside the workspace + invite / remove members + delete the workspace |
+| **Editor** (family, planner, MOH) | Create / read / update / delete events, guests, budget, tasks, documents, vendors. Cannot manage members or delete the workspace. |
+| **Viewer** (extended family, vendor with login) | Read-only access to all data in the workspace |
+
+The signup `role` field (bride / groom / family / planner) is now a cosmetic label only — workspace permissions come from `workspace_members.role`.
+
+### Inviting your partner
+
+After signing up, your personal workspace is created automatically. Go to **Settings → Members & roles** and click "Invite someone" to email a join link to your partner with role = `owner` (so both of you co-own the wedding). Family / planners get `editor` or `viewer`.
+
+A planner who works with multiple couples can belong to many workspaces and switch between them with the workspace switcher in the header.
+
+### Superadmin (god-mode)
+
+A `is_superadmin` flag on `public.users` grants:
+- Full read/write access to every workspace via RLS helper `is_superadmin()`
+- The `/admin` panel with stats, user management, workspace management, and audit log
+- The ability to "Enter workspace" from `/admin/workspaces` — sets the active workspace cookie and shows a yellow banner in the dashboard reminding you that you're impersonating
+- Suspend / unsuspend users (suspended users can't log in)
+
+To bootstrap the first superadmin, set `SUPERADMIN_EMAILS=you@example.com` in your environment and log in. The login server action will idempotently set `users.is_superadmin = true` for that email. After that you can manage superadmins through the `/admin/users` page.
+
+All admin-level mutations are written to `admin_audit_log` and shown at `/admin/audit`.
 
 ---
 

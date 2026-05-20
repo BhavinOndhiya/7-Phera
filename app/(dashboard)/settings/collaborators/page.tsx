@@ -1,12 +1,25 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { Mail, Loader2, Users } from 'lucide-react';
+import {
+  Crown,
+  Loader2,
+  Mail,
+  Pencil,
+  Trash2,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -16,107 +29,197 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
-import { useEvents } from '@/lib/hooks/useEvents';
+import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { EmptyState } from '@/components/shared/EmptyState';
-import type { UserProfile, CollaboratorRole } from '@/lib/types/database.types';
+import { roleDescription, roleLabel } from '@/lib/utils/permissions';
+import type {
+  UserProfile,
+  WorkspaceInvitation,
+  WorkspaceMember,
+  WorkspaceRole,
+} from '@/lib/types/database.types';
 
-interface CollaboratorRow {
-  id: string;
-  event_id: string;
-  user_id: string;
-  role: CollaboratorRole;
+interface MemberRow {
+  member: WorkspaceMember;
   profile: UserProfile | null;
-  event_name: string;
 }
 
 export default function CollaboratorsPage() {
   const supabase = createClient();
-  const { events } = useEvents();
+  const { activeWorkspace, activeWorkspaceId, can, isSuperadmin } = useWorkspace();
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<CollaboratorRole>('editor');
-  const [eventId, setEventId] = useState<string>('');
+  const [role, setRole] = useState<WorkspaceRole>('editor');
   const [isPending, startTransition] = useTransition();
-  const [collaborators, setCollaborators] = useState<CollaboratorRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const canManage = can('manage_members');
 
   useEffect(() => {
-    if (events.length > 0 && !eventId) setEventId(events[0].id);
-  }, [events, eventId]);
-
-  useEffect(() => {
+    if (!activeWorkspaceId) {
+      setMembers([]);
+      setInvitations([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     (async () => {
-      const { data: collab } = await supabase
-        .from('event_collaborators')
-        .select('*');
-      if (!collab || collab.length === 0) {
-        setCollaborators([]);
-        return;
-      }
-      const userIds = Array.from(new Set(collab.map((c) => c.user_id)));
-      const { data: users } = await supabase
-        .from('users')
-        .select('*')
-        .in('id', userIds);
-      const rows = collab.map((c) => ({
-        id: c.id,
-        event_id: c.event_id,
-        user_id: c.user_id,
-        role: c.role,
-        profile: users?.find((u) => u.id === c.user_id) ?? null,
-        event_name: events.find((e) => e.id === c.event_id)?.name ?? '—',
-      }));
-      setCollaborators(rows);
+      const [{ data: m }, { data: inv }] = await Promise.all([
+        supabase
+          .from('workspace_members')
+          .select('*')
+          .eq('workspace_id', activeWorkspaceId),
+        supabase
+          .from('workspace_invitations')
+          .select('*')
+          .eq('workspace_id', activeWorkspaceId)
+          .is('accepted_at', null),
+      ]);
+
+      const userIds = (m ?? []).map((row) => row.user_id);
+      const { data: profiles } = userIds.length
+        ? await supabase.from('users').select('*').in('id', userIds)
+        : { data: [] };
+
+      setMembers(
+        (m ?? []).map((row) => ({
+          member: row,
+          profile: profiles?.find((p) => p.id === row.user_id) ?? null,
+        }))
+      );
+      setInvitations(inv ?? []);
+      setLoading(false);
     })();
-  }, [supabase, events]);
+  }, [supabase, activeWorkspaceId]);
 
   function invite() {
+    if (!activeWorkspaceId) {
+      toast.error('No workspace selected');
+      return;
+    }
     if (!email) {
-      toast.error('Email required');
+      toast.error('Email is required');
       return;
     }
     startTransition(async () => {
-      const res = await fetch('/api/collaborators/invite', {
+      const res = await fetch('/api/workspaces/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, role, eventId: eventId || null }),
+        body: JSON.stringify({
+          workspaceId: activeWorkspaceId,
+          email,
+          role,
+        }),
       });
-      const data = await res.json();
+      const json = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Invite failed');
+        toast.error(json.error ?? 'Invite failed');
         return;
       }
-      toast.success(`Invitation sent to ${email}`);
+      toast.success(
+        json.emailSent
+          ? `Invitation emailed to ${email}`
+          : `Invitation created. Share the link: ${json.acceptUrl}`
+      );
       setEmail('');
+      const { data: inv } = await supabase
+        .from('workspace_invitations')
+        .select('*')
+        .eq('workspace_id', activeWorkspaceId)
+        .is('accepted_at', null);
+      setInvitations(inv ?? []);
     });
   }
 
-  async function remove(id: string) {
-    if (!confirm('Remove this collaborator?')) return;
+  async function changeRole(userId: string, newRole: WorkspaceRole) {
+    if (!activeWorkspaceId) return;
     const { error } = await supabase
-      .from('event_collaborators')
+      .from('workspace_members')
+      .update({ role: newRole })
+      .eq('workspace_id', activeWorkspaceId)
+      .eq('user_id', userId);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setMembers((prev) =>
+      prev.map((r) =>
+        r.member.user_id === userId
+          ? { ...r, member: { ...r.member, role: newRole } }
+          : r
+      )
+    );
+    toast.success('Role updated');
+  }
+
+  async function removeMember(userId: string) {
+    if (!activeWorkspaceId) return;
+    if (!confirm('Remove this member?')) return;
+    const { error } = await supabase
+      .from('workspace_members')
+      .delete()
+      .eq('workspace_id', activeWorkspaceId)
+      .eq('user_id', userId);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setMembers((prev) => prev.filter((r) => r.member.user_id !== userId));
+    toast.success('Member removed');
+  }
+
+  async function cancelInvite(id: string) {
+    const { error } = await supabase
+      .from('workspace_invitations')
       .delete()
       .eq('id', id);
     if (error) {
       toast.error(error.message);
       return;
     }
-    setCollaborators((prev) => prev.filter((c) => c.id !== id));
-    toast.success('Removed');
+    setInvitations((prev) => prev.filter((i) => i.id !== id));
+    toast.success('Invitation cancelled');
   }
+
+  function copyInviteLink(token: string) {
+    const url = `${window.location.origin}/invite/accept?token=${token}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Invite link copied to clipboard');
+  }
+
+  if (!activeWorkspace) {
+    return (
+      <EmptyState
+        icon={Users}
+        title="Pick a workspace first"
+        description="Use the workspace switcher in the header to choose a wedding to manage."
+      />
+    );
+  }
+
+  const ownerCount = members.filter((r) => r.member.role === 'owner').length;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="font-serif text-3xl font-semibold">Collaborators</h1>
+        <h1 className="font-serif text-3xl font-semibold">Members & roles</h1>
         <p className="text-muted-foreground mt-1">
-          Invite family members or planners to help with your events.
+          Manage who can access <strong>{activeWorkspace.name}</strong>.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Invite someone</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-rose-500" /> Invite someone
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!canManage && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+              Only workspace owners can invite or manage members.
+            </div>
+          )}
           <div className="grid sm:grid-cols-3 gap-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="email">Email</Label>
@@ -128,6 +231,7 @@ export default function CollaboratorsPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="family@example.com"
+                  disabled={!canManage}
                   className="pl-9"
                 />
               </div>
@@ -136,86 +240,114 @@ export default function CollaboratorsPage() {
               <Label>Role</Label>
               <Select
                 value={role}
-                onValueChange={(v) => setRole(v as CollaboratorRole)}
+                onValueChange={(v) => setRole(v as WorkspaceRole)}
+                disabled={!canManage}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="owner">Owner (co-own)</SelectItem>
                   <SelectItem value="editor">Editor</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="viewer">Viewer (read-only)</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {roleDescription(role)}
+              </p>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Event (optional)</Label>
-            <Select value={eventId} onValueChange={setEventId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pick an event" />
-              </SelectTrigger>
-              <SelectContent>
-                {events.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <Button
             onClick={invite}
-            disabled={isPending}
+            disabled={isPending || !canManage}
             className="bg-rose-500 hover:bg-rose-600"
           >
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Send invitation
           </Button>
           <p className="text-xs text-muted-foreground">
-            Requires SUPABASE_SERVICE_ROLE_KEY in .env.local. The invited user
-            receives an email with a Supabase magic link to set up their account.
+            We email a join link via Resend. Set <code>RESEND_API_KEY</code> and{' '}
+            <code>NEXT_PUBLIC_APP_URL</code> in env to enable email delivery; without
+            it you&apos;ll just copy the invite link.
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Current collaborators</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-rose-500" /> Members
+            <Badge variant="secondary">{members.length}</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {collaborators.length === 0 ? (
+          {loading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Loading...
+            </div>
+          ) : members.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No collaborators yet"
-              description="Invite someone above to share planning duties."
+              title="No members yet"
+              description="Invite people above to share planning."
             />
           ) : (
             <div className="divide-y -m-6">
-              {collaborators.map((c) => (
+              {members.map(({ member, profile }) => (
                 <div
-                  key={c.id}
-                  className="flex items-center justify-between p-4"
+                  key={member.user_id}
+                  className="flex items-center justify-between p-4 gap-3"
                 >
-                  <div>
-                    <p className="font-medium">
-                      {c.profile?.full_name ?? c.profile?.email ?? c.user_id}
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
+                      {profile?.full_name ?? 'Unknown'}
+                      {member.role === 'owner' && (
+                        <Crown className="inline h-3.5 w-3.5 text-amber-500 ml-1 -mt-0.5" />
+                      )}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {c.event_name} · {c.profile?.email}
+                    <p className="text-xs text-muted-foreground truncate">
+                      {profile?.email}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="capitalize">
-                      {c.role}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() => remove(c.id)}
-                    >
-                      Remove
-                    </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {canManage ? (
+                      <Select
+                        value={member.role}
+                        onValueChange={(v) =>
+                          changeRole(member.user_id, v as WorkspaceRole)
+                        }
+                        disabled={member.role === 'owner' && ownerCount === 1}
+                      >
+                        <SelectTrigger className="h-8 w-28 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="editor">Editor</SelectItem>
+                          <SelectItem value="viewer">Viewer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Badge variant="outline" className="capitalize">
+                        {roleLabel(member.role)}
+                      </Badge>
+                    )}
+                    {canManage && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive h-8 w-8"
+                        onClick={() => removeMember(member.user_id)}
+                        disabled={member.role === 'owner' && ownerCount === 1}
+                        title={
+                          member.role === 'owner' && ownerCount === 1
+                            ? "Can't remove the only owner"
+                            : 'Remove'
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -223,6 +355,64 @@ export default function CollaboratorsPage() {
           )}
         </CardContent>
       </Card>
+
+      {invitations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-rose-500" /> Pending invitations
+              <Badge variant="secondary">{invitations.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y -m-6">
+              {invitations.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="flex items-center justify-between p-4 gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{inv.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Invited as {inv.role} · expires{' '}
+                      {new Date(inv.expires_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyInviteLink(inv.token)}
+                    >
+                      <Pencil className="h-3 w-3 mr-1" /> Copy link
+                    </Button>
+                    {canManage && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive h-8 w-8"
+                        onClick={() => cancelInvite(inv.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isSuperadmin && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
+          <strong>Superadmin note:</strong> You can manage any workspace from the{' '}
+          <a href="/admin/workspaces" className="underline">
+            admin panel
+          </a>
+          .
+        </div>
+      )}
     </div>
   );
 }

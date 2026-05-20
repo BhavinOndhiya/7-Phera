@@ -21,6 +21,7 @@ import {
 import { ExpenseForm } from './ExpenseForm';
 import { PaymentTracker } from './PaymentTracker';
 import { useBudget } from '@/lib/hooks/useBudget';
+import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatINR, formatINRShort } from '@/lib/utils/formatting';
 import { PAYMENT_STATUSES, PRIORITIES } from '@/lib/constants';
 import { calculateCategoryBreakdown } from '@/lib/utils/calculations';
@@ -28,6 +29,10 @@ import type { BudgetItem } from '@/lib/types/database.types';
 
 export function BudgetTable({ eventId }: { eventId: string }) {
   const { budgetItems, categories, vendors, deleteItem } = useBudget(eventId);
+  const { can } = useWorkspace();
+  const canCreate = can('create_budget');
+  const canEdit = can('edit_budget');
+  const canDelete = can('delete_budget');
   const [addOpen, setAddOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
 
@@ -45,24 +50,28 @@ export function BudgetTable({ eventId }: { eventId: string }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-serif text-xl font-semibold">Budget items</h2>
-        <Button
-          className="bg-rose-500 hover:bg-rose-600"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" /> Add item
-        </Button>
+        {canCreate && (
+          <Button
+            className="bg-rose-500 hover:bg-rose-600"
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Add item
+          </Button>
+        )}
       </div>
 
       {budgetItems.length === 0 && (
         <Card>
           <CardContent className="py-10 text-center">
             <p className="text-muted-foreground">No budget items yet.</p>
-            <Button
-              className="mt-4 bg-rose-500 hover:bg-rose-600"
-              onClick={() => setAddOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" /> Add your first item
-            </Button>
+            {canCreate && (
+              <Button
+                className="mt-4 bg-rose-500 hover:bg-rose-600"
+                onClick={() => setAddOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add your first item
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -97,6 +106,8 @@ export function BudgetTable({ eventId }: { eventId: string }) {
                     vendorName={
                       vendors.find((v) => v.id === item.vendor_id)?.name
                     }
+                    canEdit={canEdit}
+                    canDelete={canDelete}
                     onEdit={() => setEditingItem(item)}
                     onDelete={async () => {
                       if (confirm(`Delete "${item.item_name}"?`)) {
@@ -125,6 +136,8 @@ export function BudgetTable({ eventId }: { eventId: string }) {
                   vendorName={
                     vendors.find((v) => v.id === item.vendor_id)?.name
                   }
+                  canEdit={canEdit}
+                  canDelete={canDelete}
                   onEdit={() => setEditingItem(item)}
                   onDelete={async () => {
                     if (confirm(`Delete "${item.item_name}"?`)) {
@@ -178,11 +191,15 @@ export function BudgetTable({ eventId }: { eventId: string }) {
 function BudgetRow({
   item,
   vendorName,
+  canEdit,
+  canDelete,
   onEdit,
   onDelete,
 }: {
   item: BudgetItem;
   vendorName?: string;
+  canEdit: boolean;
+  canDelete: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -224,21 +241,30 @@ function BudgetRow({
 
       <div className="flex items-center gap-1">
         <PaymentTracker item={item} />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit}>
-              <Edit className="h-4 w-4 mr-2" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {(canEdit || canDelete) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit && (
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit className="h-4 w-4 mr-2" /> Edit
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );

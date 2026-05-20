@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   Event,
   InsertTables,
@@ -11,18 +12,26 @@ import type {
 
 export function useEvents() {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchEvents = useCallback(async () => {
+    if (!workspaceId) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from('events')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .order('event_date', { ascending: true });
     if (error) toast.error(`Failed to load events: ${error.message}`);
     else setEvents(data ?? []);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     fetchEvents();
@@ -40,9 +49,13 @@ export function useEvents() {
   }, [supabase, fetchEvents]);
 
   async function addEvent(event: InsertTables<'events'>) {
+    if (!workspaceId) {
+      toast.error('Pick a workspace first');
+      return null;
+    }
     const { data, error } = await supabase
       .from('events')
-      .insert(event)
+      .insert({ ...event, workspace_id: workspaceId })
       .select()
       .single();
     if (error) {

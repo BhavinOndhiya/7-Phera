@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select';
 import { TaskForm } from './TaskForm';
 import { useTasks } from '@/lib/hooks/useTasks';
+import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatDate, daysUntil } from '@/lib/utils/formatting';
 import { PRIORITIES } from '@/lib/constants';
 import type { Task, TaskStatus } from '@/lib/types/database.types';
@@ -69,6 +70,10 @@ const COLUMNS: {
 
 export function TasksKanban({ eventId }: { eventId: string }) {
   const { tasks, deleteTask, toggleStatus } = useTasks(eventId);
+  const { can } = useWorkspace();
+  const canCreate = can('create_task');
+  const canEdit = can('edit_task');
+  const canDelete = can('delete_task');
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
 
@@ -89,12 +94,14 @@ export function TasksKanban({ eventId }: { eventId: string }) {
         <h2 className="font-serif text-xl font-semibold">
           {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
         </h2>
-        <Button
-          className="bg-rose-500 hover:bg-rose-600"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" /> Add task
-        </Button>
+        {canCreate && (
+          <Button
+            className="bg-rose-500 hover:bg-rose-600"
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Add task
+          </Button>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -115,6 +122,8 @@ export function TasksKanban({ eventId }: { eventId: string }) {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
                     onEdit={() => setEditing(task)}
                     onDelete={async () => {
                       if (confirm(`Delete "${task.title}"?`)) {
@@ -166,11 +175,15 @@ export function TasksKanban({ eventId }: { eventId: string }) {
 
 function TaskCard({
   task,
+  canEdit,
+  canDelete,
   onEdit,
   onDelete,
   onStatusChange,
 }: {
   task: Task;
+  canEdit: boolean;
+  canDelete: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onStatusChange: (status: TaskStatus) => void;
@@ -185,25 +198,34 @@ function TaskCard({
         <p className="font-medium text-sm leading-snug flex-1 min-w-0">
           {task.title}
         </p>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 -mr-1 -mt-1"
-            >
-              <MoreVertical className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit}>
-              <Edit className="h-4 w-4 mr-2" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {(canEdit || canDelete) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 -mr-1 -mt-1"
+              >
+                <MoreVertical className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit && (
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit className="h-4 w-4 mr-2" /> Edit
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {task.description && (
@@ -233,6 +255,7 @@ function TaskCard({
       <Select
         value={task.status}
         onValueChange={(v) => onStatusChange(v as TaskStatus)}
+        disabled={!canEdit}
       >
         <SelectTrigger className="h-7 text-xs">
           <SelectValue />

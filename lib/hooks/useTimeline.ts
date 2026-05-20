@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   TimelineItem,
   InsertTables,
@@ -11,10 +12,17 @@ import type {
 
 export function useTimeline(eventId?: string) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchItems = useCallback(async () => {
+    if (!eventId && !workspaceId) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     const query = eventId
       ? supabase
           .from('timeline_items')
@@ -24,12 +32,13 @@ export function useTimeline(eventId?: string) {
       : supabase
           .from('timeline_items')
           .select('*')
+          .eq('workspace_id', workspaceId!)
           .order('start_time', { ascending: true });
     const { data, error } = await query;
     if (error) toast.error(error.message);
     else setItems(data ?? []);
     setLoading(false);
-  }, [supabase, eventId]);
+  }, [supabase, eventId, workspaceId]);
 
   useEffect(() => {
     fetchItems();
@@ -47,9 +56,13 @@ export function useTimeline(eventId?: string) {
   }, [supabase, fetchItems]);
 
   async function addItem(item: InsertTables<'timeline_items'>) {
+    if (!workspaceId) {
+      toast.error('Pick a workspace first');
+      return null;
+    }
     const { data, error } = await supabase
       .from('timeline_items')
-      .insert(item)
+      .insert({ ...item, workspace_id: workspaceId })
       .select()
       .single();
     if (error) {

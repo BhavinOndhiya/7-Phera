@@ -46,6 +46,7 @@ import {
 import { GuestForm } from './GuestForm';
 import { GuestQRCard } from './GuestQRCard';
 import { useGuests } from '@/lib/hooks/useGuests';
+import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { RSVP_STATUSES, SIDES } from '@/lib/constants';
 import type { Guest, Side, RsvpStatus } from '@/lib/types/database.types';
 import { GuestImport } from './GuestImport';
@@ -58,6 +59,10 @@ interface GuestTableProps {
 
 export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const { guests, loading, updateRsvp, deleteGuest } = useGuests({ eventId });
+  const { can } = useWorkspace();
+  const canEdit = can('edit_guest');
+  const canDelete = can('delete_guest');
+  const canCreate = can('create_guest');
   const [search, setSearch] = useState('');
   const [sideFilter, setSideFilter] = useState<Side | 'all'>('all');
   const [rsvpFilter, setRsvpFilter] = useState<RsvpStatus | 'all'>('all');
@@ -110,15 +115,19 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 ml-auto">
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            Import CSV
-          </Button>
-          <Button
-            className="bg-rose-500 hover:bg-rose-600"
-            onClick={() => setAddOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" /> Add guest
-          </Button>
+          {canCreate && (
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              Import CSV
+            </Button>
+          )}
+          {canCreate && (
+            <Button
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add guest
+            </Button>
+          )}
         </div>
       </div>
 
@@ -242,6 +251,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                   <Select
                     value={guest.rsvp_status}
                     onValueChange={(v) => onRsvpChange(guest.id, v as RsvpStatus)}
+                    disabled={!canEdit}
                   >
                     <SelectTrigger className="h-8 w-[120px] text-xs">
                       <SelectValue />
@@ -264,32 +274,38 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                         eventName={eventName}
                       />
                     )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditingGuest(guest)}>
-                          <Edit className="h-4 w-4 mr-2" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={async () => {
-                            if (
-                              confirm(
-                                `Remove ${guest.full_name} from your guest list?`
-                              )
-                            ) {
-                              await deleteGuest(guest.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {(canEdit || canDelete) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canEdit && (
+                            <DropdownMenuItem onClick={() => setEditingGuest(guest)}>
+                              <Edit className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={async () => {
+                                if (
+                                  confirm(
+                                    `Remove ${guest.full_name} from your guest list?`
+                                  )
+                                ) {
+                                  await deleteGuest(guest.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
