@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import { guestSchema } from '@/lib/utils/validation';
 import { DIETARY_OPTIONS, RELATIONS } from '@/lib/constants';
 import type { Guest, Side, AgeGroup, RsvpStatus } from '@/lib/types/database.types';
@@ -28,6 +29,8 @@ interface GuestFormProps {
 
 export function GuestForm({ initial, eventId, onDone }: GuestFormProps) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [isPending, startTransition] = useTransition();
 
   const initialPartySize = initial?.party_size ?? 1;
@@ -98,9 +101,13 @@ export function GuestForm({ initial, eventId, onDone }: GuestFormProps) {
         toast.success('Guest updated');
         onDone?.(data);
       } else {
+        if (!workspaceId) {
+          toast.error('Pick a workspace first');
+          return;
+        }
         const { data, error } = await supabase
           .from('guests')
-          .insert(payload)
+          .insert({ ...payload, workspace_id: workspaceId })
           .select()
           .single();
         if (error) {
