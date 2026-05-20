@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 340 10% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 340 10% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 340 10% 12%;
+    --primary: 340 82% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 38 60% 95%;
+    --secondary-foreground: 340 30% 20%;
+    --muted: 340 20% 96%;
+    --muted-foreground: 340 5% 45%;
+    --accent: 38 95% 60%;
+    --accent-foreground: 340 30% 15%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 340 20% 90%;
+    --input: 340 20% 90%;
+    --ring: 340 82% 52%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 340 15% 8%;
+    --foreground: 340 10% 96%;
+    --card: 340 15% 11%;
+    --card-foreground: 340 10% 96%;
+    --popover: 340 15% 11%;
+    --popover-foreground: 340 10% 96%;
+    --primary: 340 82% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 340 15% 18%;
+    --secondary-foreground: 340 10% 96%;
+    --muted: 340 15% 18%;
+    --muted-foreground: 340 10% 65%;
+    --accent: 38 85% 55%;
+    --accent-foreground: 340 30% 10%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 340 15% 22%;
+    --input: 340 15% 22%;
+    --ring: 340 82% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .gradient-rose {
+    background: linear-gradient(135deg, #fb2e63 0%, #ff6485 100%);
+  }
+  .gradient-gold {
+    background: linear-gradient(135deg, #d8901e 0%, #eaaf36 100%);
+  }
+  .gradient-elegant {
+    background: linear-gradient(135deg, #fb2e63 0%, #d8901e 100%);
+  }
+  .glass {
+    @apply bg-white/70 backdrop-blur-md;
+  }
+}
+
+/* Recharts tooltip override */
+.recharts-default-tooltip {
+  @apply rounded-lg border shadow-md !important;
+}

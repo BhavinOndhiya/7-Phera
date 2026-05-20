@@ -1,0 +1,219 @@
+import { NextResponse } from 'next/server';
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  renderToBuffer,
+} from '@react-pdf/renderer';
+import React from 'react';
+import { createClient } from '@/lib/supabase/server';
+
+export const runtime = 'nodejs';
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 36,
+    fontFamily: 'Helvetica',
+    fontSize: 10,
+    color: '#1f2937',
+  },
+  header: { marginBottom: 16, borderBottom: '2 solid #fb2e63', paddingBottom: 8 },
+  title: { fontSize: 22, fontWeight: 'bold', color: '#9f1239' },
+  subtitle: { fontSize: 11, color: '#6b7280', marginTop: 4 },
+  statsRow: { flexDirection: 'row', marginBottom: 14, gap: 12 },
+  stat: {
+    flex: 1,
+    backgroundColor: '#fff1f2',
+    borderRadius: 6,
+    padding: 8,
+  },
+  statValue: { fontSize: 18, fontWeight: 'bold', color: '#9f1239' },
+  statLabel: { fontSize: 9, color: '#6b7280', marginTop: 2 },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#fff1f2',
+    padding: 6,
+    fontWeight: 'bold',
+    fontSize: 10,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    padding: 5,
+    borderBottom: '1 solid #e5e7eb',
+    fontSize: 9,
+  },
+  col1: { flex: 3 },
+  col2: { flex: 2 },
+  col3: { flex: 2 },
+  col4: { flex: 2 },
+  col5: { flex: 1.5 },
+  footer: {
+    position: 'absolute',
+    bottom: 18,
+    left: 36,
+    right: 36,
+    textAlign: 'center',
+    color: '#9ca3af',
+    fontSize: 8,
+  },
+});
+
+interface GuestRow {
+  full_name: string;
+  side: string;
+  relation: string;
+  phone: string | null;
+  email: string | null;
+  rsvp_status: string;
+  party_size: number;
+}
+
+interface PdfData {
+  eventName: string;
+  eventDate: string;
+  guests: GuestRow[];
+}
+
+function buildDoc(data: PdfData) {
+  const sumWhere = (predicate: (s: string) => boolean) =>
+    data.guests.filter((g) => predicate(g.rsvp_status)).reduce((s, g) => s + Math.max(1, g.party_size), 0);
+
+  const stats = {
+    total: data.guests.reduce((s, g) => s + Math.max(1, g.party_size), 0),
+    accepted: sumWhere((s) => s === 'accepted'),
+    pending: sumWhere((s) => s === 'pending'),
+    declined: sumWhere((s) => s === 'declined'),
+  };
+
+  return React.createElement(
+    Document,
+    null,
+    React.createElement(
+      Page,
+      { size: 'A4', style: styles.page },
+      React.createElement(
+        View,
+        { style: styles.header },
+        React.createElement(Text, { style: styles.title }, data.eventName),
+        React.createElement(
+          Text,
+          { style: styles.subtitle },
+          `Guest list · ${data.eventDate}`
+        )
+      ),
+      React.createElement(
+        View,
+        { style: styles.statsRow },
+        React.createElement(
+          View,
+          { style: styles.stat },
+          React.createElement(Text, { style: styles.statValue }, String(stats.total)),
+          React.createElement(Text, { style: styles.statLabel }, 'Total')
+        ),
+        React.createElement(
+          View,
+          { style: styles.stat },
+          React.createElement(Text, { style: styles.statValue }, String(stats.accepted)),
+          React.createElement(Text, { style: styles.statLabel }, 'Accepted')
+        ),
+        React.createElement(
+          View,
+          { style: styles.stat },
+          React.createElement(Text, { style: styles.statValue }, String(stats.pending)),
+          React.createElement(Text, { style: styles.statLabel }, 'Pending')
+        ),
+        React.createElement(
+          View,
+          { style: styles.stat },
+          React.createElement(Text, { style: styles.statValue }, String(stats.declined)),
+          React.createElement(Text, { style: styles.statLabel }, 'Declined')
+        )
+      ),
+      React.createElement(
+        View,
+        { style: styles.tableHeader },
+        React.createElement(Text, { style: styles.col1 }, 'Name'),
+        React.createElement(Text, { style: styles.col2 }, 'Relation'),
+        React.createElement(Text, { style: styles.col3 }, 'Phone'),
+        React.createElement(Text, { style: styles.col4 }, 'Email'),
+        React.createElement(Text, { style: styles.col5 }, 'RSVP')
+      ),
+      ...data.guests.map((g, idx) => {
+        const nameLabel =
+          g.party_size > 1
+            ? `${g.full_name} (${g.side}) · ${g.party_size} people`
+            : `${g.full_name} (${g.side})`;
+        return React.createElement(
+          View,
+          { key: idx, style: styles.tableRow },
+          React.createElement(Text, { style: styles.col1 }, nameLabel),
+          React.createElement(Text, { style: styles.col2 }, g.relation),
+          React.createElement(Text, { style: styles.col3 }, g.phone ?? '—'),
+          React.createElement(Text, { style: styles.col4 }, g.email ?? '—'),
+          React.createElement(Text, { style: styles.col5 }, g.rsvp_status)
+        );
+      }),
+      React.createElement(
+        Text,
+        { style: styles.footer, fixed: true },
+        `Generated by Saath Phere · ${new Date().toLocaleDateString()}`
+      )
+    )
+  );
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const eventId = searchParams.get('eventId');
+  if (!eventId) {
+    return NextResponse.json({ error: 'eventId required' }, { status: 400 });
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  const { data: event } = await supabase
+    .from('events')
+    .select('name, event_date')
+    .eq('id', eventId)
+    .maybeSingle();
+  if (!event) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  }
+
+  const { data: eg } = await supabase
+    .from('event_guests')
+    .select('guest_id')
+    .eq('event_id', eventId);
+  const ids = (eg ?? []).map((r) => r.guest_id);
+  const { data: guests } = ids.length
+    ? await supabase
+        .from('guests')
+        .select('full_name, side, relation, phone, email, rsvp_status, party_size')
+        .in('id', ids)
+        .order('full_name')
+    : { data: [] };
+
+  const doc = buildDoc({
+    eventName: event.name,
+    eventDate: new Date(event.event_date).toLocaleDateString('en-IN'),
+    guests: (guests ?? []) as GuestRow[],
+  });
+
+  const buffer = await renderToBuffer(doc);
+
+  return new NextResponse(new Uint8Array(buffer), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${event.name.replace(/[^a-z0-9]/gi, '_')}_guests.pdf"`,
+    },
+  });
+}

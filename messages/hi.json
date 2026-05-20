@@ -1,0 +1,75 @@
+{
+  "Brand": {
+    "name": "साथ फेरे",
+    "tagline": "प्यार के साथ अपने खास दिन की योजना बनाएं"
+  },
+  "Nav": {
+    "dashboard": "डैशबोर्ड",
+    "events": "कार्यक्रम",
+    "guests": "मेहमान",
+    "budget": "बजट",
+    "vendors": "विक्रेता",
+    "tasks": "कार्य",
+    "timeline": "समय-सारिणी",
+    "documents": "दस्तावेज़",
+    "gallery": "गैलरी",
+    "gifts": "उपहार",
+    "settings": "सेटिंग्स"
+  },
+  "Header": {
+    "language": "भाषा",
+    "logout": "लॉग आउट",
+    "settings": "सेटिंग्स"
+  },
+  "Landing": {
+    "hero_title_1": "अपनी शादी की योजना बनाएं,",
+    "hero_title_2": "प्यार का जश्न मनाएं",
+    "hero_subtitle": "हर रस्म के लिए एक शांत जगह — संगीत से विदाई तक। कार्य, मेहमान, बजट, विक्रेता और यादें, सुंदर ढंग से व्यवस्थित।",
+    "cta_start": "मुफ़्त शुरू करें",
+    "cta_login": "मेरा खाता है",
+    "features_title": "आपको जो कुछ चाहिए",
+    "features_subtitle": "भारतीय शादियों के लिए बना"
+  },
+  "Common": {
+    "loading": "लोड हो रहा है…",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "create": "बनाएं",
+    "back": "वापस",
+    "search": "खोजें…",
+    "no_results": "कोई परिणाम नहीं",
+    "all": "सभी"
+  },
+  "Dashboard": {
+    "title": "आपका शादी डैशबोर्ड",
+    "subtitle": "यहां सब कुछ का सारांश है।",
+    "new_event": "नया कार्यक्रम",
+    "events": "कार्यक्रम",
+    "guests": "मेहमान",
+    "budget": "बजट",
+    "vendors": "विक्रेता",
+    "upcoming": "{count} आगामी",
+    "confirmed": "{count} पुष्टि",
+    "paid": "{amount} भुगतान",
+    "booked_so_far": "अब तक बुक",
+    "upcoming_events": "आगामी कार्यक्रम",
+    "budget_snapshot": "बजट सारांश",
+    "tasks_to_do": "करने के कार्य",
+    "view_all": "सब देखें",
+    "no_upcoming": "कोई आगामी कार्यक्रम नहीं",
+    "no_upcoming_desc": "शुरू करने के लिए अपना पहला कार्यक्रम बनाएं।",
+    "all_caught_up": "सब पूरा!",
+    "all_caught_up_desc": "आपके पास कोई लंबित कार्य नहीं है। बढ़िया काम।",
+    "today": "आज"
+  },
+  "Countdown": {
+    "counting_down": "की उलटी गिनती",
+    "days": "दिन",
+    "hours": "घंटे",
+    "minutes": "मिनट",
+    "seconds": "सेकंड",
+    "big_day": "वो खास दिन आ गया!"
+  }
+}

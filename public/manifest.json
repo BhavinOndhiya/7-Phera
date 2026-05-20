@@ -1,0 +1,27 @@
+{
+  "name": "Saath Phere — Wedding Planner",
+  "short_name": "Saath Phere",
+  "description": "Plan your perfect wedding — events, guests, budget, vendors, and more.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff7f8",
+  "theme_color": "#fb2e63",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "productivity"]
+}

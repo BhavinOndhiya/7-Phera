@@ -1,0 +1,220 @@
+'use client';
+
+import { useRef, useState, useTransition } from 'react';
+import Papa from 'papaparse';
+import { toast } from 'sonner';
+import { Upload, Loader2, FileText, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { createClient } from '@/lib/supabase/client';
+import type { InsertTables, Side, AgeGroup } from '@/lib/types/database.types';
+
+interface CsvRow {
+  full_name?: string;
+  side?: string;
+  relation?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  age_group?: string;
+  plus_one?: string;
+  party_size?: string;
+}
+
+const SAMPLE_CSV = `full_name,side,relation,phone,email,age_group,plus_one,party_size
+Priya Sharma,bride,Cousin,+919876543210,priya@example.com,adult,true,1
+Arjun Mehta,groom,Friend,+919812345678,arjun@example.com,adult,false,1
+The Verma Family,bride,Aunt,+919800001111,verma@example.com,adult,false,5
+Patel Family,groom,Family Friend,+919800002222,,adult,false,4
+`;
+
+export function GuestImport({
+  eventId,
+  onDone,
+}: {
+  eventId?: string;
+  onDone?: () => void;
+}) {
+  const supabase = createClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<CsvRow[]>([]);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function parseFile(file: File) {
+    setFileName(file.name);
+    Papa.parse<CsvRow>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        setRows(results.data);
+        toast.success(`Found ${results.data.length} rows`);
+      },
+      error: (err) => toast.error(`CSV parse failed: ${err.message}`),
+    });
+  }
+
+  function downloadSample() {
+    const blob = new Blob([SAMPLE_CSV], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'guests-sample.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function doImport() {
+    startTransition(async () => {
+      const inserts: InsertTables<'guests'>[] = rows
+        .filter((r) => r.full_name && r.relation)
+        .map((r) => {
+          const side: Side = r.side?.toLowerCase() === 'groom' ? 'groom' : 'bride';
+          const ageRaw = r.age_group?.toLowerCase();
+          const age_group: AgeGroup =
+            ageRaw === 'child' || ageRaw === 'senior' ? ageRaw : 'adult';
+          const parsedPartySize = Number(r.party_size ?? 1);
+          const party_size = Math.max(
+            1,
+            Math.min(50, isFinite(parsedPartySize) ? parsedPartySize : 1)
+          );
+          return {
+            full_name: r.full_name!.trim(),
+            side,
+            relation: r.relation!.trim(),
+            phone: r.phone?.trim() || null,
+            email: r.email?.trim() || null,
+            address: r.address?.trim() || null,
+            age_group,
+            plus_one:
+              r.plus_one?.toLowerCase() === 'true' || r.plus_one === '1',
+            party_size,
+          };
+        });
+
+      if (inserts.length === 0) {
+        toast.error('No valid rows found. Need at least full_name and relation.');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('guests')
+        .insert(inserts)
+        .select();
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      if (eventId && data && data.length > 0) {
+        await supabase
+          .from('event_guests')
+          .insert(data.map((g) => ({ event_id: eventId, guest_id: g.id })));
+      }
+
+      toast.success(`Imported ${data?.length ?? 0} guests`);
+      onDone?.();
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 text-center">
+        <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+        <p className="mt-3 font-medium">Upload a CSV file</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Required: full_name, side, relation · Optional: party_size (for families)
+        </p>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) parseFile(file);
+          }}
+        />
+        <Button
+          variant="outline"
+          className="mt-4"
+          onClick={() => inputRef.current?.click()}
+        >
+          Choose file
+        </Button>
+        <Button
+          variant="link"
+          size="sm"
+          className="ml-2"
+          onClick={downloadSample}
+        >
+          <Download className="h-3 w-3 mr-1" /> Download sample
+        </Button>
+      </div>
+
+      {fileName && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+          <FileText className="h-5 w-5 text-rose-500" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm truncate">{fileName}</p>
+            <p className="text-xs text-muted-foreground">
+              {rows.length} rows parsed
+            </p>
+          </div>
+          <Badge variant="secondary">{rows.length}</Badge>
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div className="max-h-48 overflow-y-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30 sticky top-0">
+              <tr>
+                <th className="text-left p-2 font-medium">Name</th>
+                <th className="text-left p-2 font-medium">Side</th>
+                <th className="text-left p-2 font-medium">Relation</th>
+                <th className="text-left p-2 font-medium">Party</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 20).map((row, i) => {
+                const size = Number(row.party_size ?? 1) || 1;
+                return (
+                  <tr key={i} className="border-t">
+                    <td className="p-2">{row.full_name}</td>
+                    <td className="p-2 capitalize">{row.side}</td>
+                    <td className="p-2">{row.relation}</td>
+                    <td className="p-2">
+                      {size > 1 ? `${size} people` : '1'}
+                    </td>
+                  </tr>
+                );
+              })}
+              {rows.length > 20 && (
+                <tr className="border-t">
+                  <td colSpan={4} className="p-2 text-center text-muted-foreground text-xs">
+                    + {rows.length - 20} more rows
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 pt-2 border-t">
+        <Button variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button
+          onClick={doImport}
+          disabled={rows.length === 0 || isPending}
+          className="bg-rose-500 hover:bg-rose-600"
+        >
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Import {rows.length > 0 ? `${rows.length} guests` : ''}
+        </Button>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,75 @@
+{
+  "Brand": {
+    "name": "Saath Phere",
+    "tagline": "Plan your perfect day with love"
+  },
+  "Nav": {
+    "dashboard": "Dashboard",
+    "events": "Events",
+    "guests": "Guests",
+    "budget": "Budget",
+    "vendors": "Vendors",
+    "tasks": "Tasks",
+    "timeline": "Timeline",
+    "documents": "Documents",
+    "gallery": "Gallery",
+    "gifts": "Gifts",
+    "settings": "Settings"
+  },
+  "Header": {
+    "language": "Language",
+    "logout": "Log out",
+    "settings": "Settings"
+  },
+  "Landing": {
+    "hero_title_1": "Plan your wedding,",
+    "hero_title_2": "celebrate the love",
+    "hero_subtitle": "One serene place for every ceremony — from sangeet to vidaai. Tasks, guests, budgets, vendors and memories, beautifully organised.",
+    "cta_start": "Start free",
+    "cta_login": "I have an account",
+    "features_title": "Everything you need",
+    "features_subtitle": "Built with Indian weddings in mind"
+  },
+  "Common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "search": "Search…",
+    "no_results": "No results",
+    "all": "All"
+  },
+  "Dashboard": {
+    "title": "Your Wedding Dashboard",
+    "subtitle": "Here's a snapshot of everything happening.",
+    "new_event": "New event",
+    "events": "Events",
+    "guests": "Guests",
+    "budget": "Budget",
+    "vendors": "Vendors",
+    "upcoming": "{count} upcoming",
+    "confirmed": "{count} confirmed",
+    "paid": "{amount} paid",
+    "booked_so_far": "Booked so far",
+    "upcoming_events": "Upcoming events",
+    "budget_snapshot": "Budget snapshot",
+    "tasks_to_do": "Tasks to do",
+    "view_all": "View all",
+    "no_upcoming": "No upcoming events",
+    "no_upcoming_desc": "Create your first event to get started.",
+    "all_caught_up": "All caught up!",
+    "all_caught_up_desc": "You have no pending tasks. Great work.",
+    "today": "Today"
+  },
+  "Countdown": {
+    "counting_down": "Counting down to",
+    "days": "Days",
+    "hours": "Hours",
+    "minutes": "Mins",
+    "seconds": "Secs",
+    "big_day": "The big day is here!"
+  }
+}
