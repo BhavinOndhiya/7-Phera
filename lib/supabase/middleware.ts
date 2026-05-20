@@ -2,13 +2,44 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/lib/types/database.types';
 
+const PROTECTED_PREFIXES = [
+  '/dashboard',
+  '/events',
+  '/guests',
+  '/budget',
+  '/vendors',
+  '/tasks',
+  '/timeline',
+  '/documents',
+  '/gallery',
+  '/gifts',
+  '/settings',
+];
+
+const AUTH_PREFIXES = ['/login', '/signup', '/forgot-password'];
+
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isProtectedRoute = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isAuthRoute = AUTH_PREFIXES.some((p) => pathname.startsWith(p));
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (isProtectedRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('reason', 'unconfigured');
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  try {
+    const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -23,43 +54,28 @@ export async function updateSession(request: NextRequest) {
           );
         },
       },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user && isProtectedRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('redirectedFrom', pathname);
+      return NextResponse.redirect(url);
     }
-  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    if (user && isAuthRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
 
-  const { pathname } = request.nextUrl;
-  const isAuthRoute =
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/signup') ||
-    pathname.startsWith('/forgot-password');
-  const isProtectedRoute =
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/events') ||
-    pathname.startsWith('/guests') ||
-    pathname.startsWith('/budget') ||
-    pathname.startsWith('/vendors') ||
-    pathname.startsWith('/tasks') ||
-    pathname.startsWith('/timeline') ||
-    pathname.startsWith('/documents') ||
-    pathname.startsWith('/gallery') ||
-    pathname.startsWith('/gifts') ||
-    pathname.startsWith('/settings');
-
-  if (!user && isProtectedRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.searchParams.set('redirectedFrom', pathname);
-    return NextResponse.redirect(url);
+    return response;
+  } catch (error) {
+    console.error('[middleware] Supabase session error:', error);
+    return response;
   }
-
-  if (user && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
-  }
-
-  return response;
 }
