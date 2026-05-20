@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import { vendorSchema } from '@/lib/utils/validation';
 import { VENDOR_CATEGORIES } from '@/lib/constants';
 import type { Vendor } from '@/lib/types/database.types';
@@ -27,6 +28,8 @@ interface VendorFormProps {
 
 export function VendorForm({ initial, onDone }: VendorFormProps) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [isPending, startTransition] = useTransition();
 
   const [form, setForm] = useState({
@@ -80,9 +83,13 @@ export function VendorForm({ initial, onDone }: VendorFormProps) {
         toast.success('Vendor updated');
         onDone?.(data);
       } else {
+        if (!workspaceId) {
+          toast.error('Pick a workspace first');
+          return;
+        }
         const { data, error } = await supabase
           .from('vendors')
-          .insert(payload)
+          .insert({ ...payload, workspace_id: workspaceId })
           .select()
           .single();
         if (error) {

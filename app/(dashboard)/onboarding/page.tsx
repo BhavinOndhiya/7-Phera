@@ -175,7 +175,7 @@ export default function OnboardingPage() {
               id="ws_name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Bhavin & Riya's Wedding"
+              placeholder="e.g. Bhavin & Prachi's Wedding"
             />
             <p className="text-xs text-muted-foreground">
               You can change this any time in settings.

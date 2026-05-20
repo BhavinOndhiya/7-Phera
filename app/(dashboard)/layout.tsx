@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { Header } from '@/components/dashboard/Header';
+import { AppFooter } from '@/components/dashboard/AppFooter';
 import { WorkspaceProvider } from '@/lib/hooks/useWorkspace';
 import { AdminImpersonationBanner } from '@/components/admin/AdminImpersonationBanner';
 
@@ -52,10 +53,11 @@ export default async function DashboardLayout({
             <Sidebar />
           </div>
         </div>
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col min-w-0 min-h-screen">
           <Header profile={profile} email={user.email ?? null} />
           <AdminImpersonationBanner />
           <main className="flex-1 p-4 md:p-8">{children}</main>
+          <AppFooter />
         </div>
       </div>
     </WorkspaceProvider>

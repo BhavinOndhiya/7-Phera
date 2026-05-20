@@ -129,7 +129,7 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
               id="name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Priya & Arjun's Sangeet"
+              placeholder="e.g. Bhavin & Prachi's Sangeet"
               required
             />
           </div>

@@ -11,6 +11,7 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { logoutAction } from '@/app/(auth)/actions';
 import { Button } from '@/components/ui/button';
+import { AppFooter } from '@/components/dashboard/AppFooter';
 
 const NAV = [
   { href: '/admin', label: 'Overview', icon: BarChart3 },
@@ -39,7 +40,7 @@ export default async function AdminLayout({
   if (!profile?.is_superadmin) redirect('/dashboard');
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-muted/30 flex flex-col">
       <div className="sticky top-0 z-30 bg-rose-700 text-white">
         <div className="bg-rose-800/40 text-xs px-4 py-1.5 text-center font-medium tracking-wide">
           You&apos;re in <strong>Superadmin mode</strong>. Actions you take are
@@ -87,12 +88,13 @@ export default async function AdminLayout({
           ))}
         </nav>
       </div>
-      <main className="p-4 md:p-8 max-w-7xl mx-auto">
+      <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
         <div className="text-xs text-muted-foreground mb-3">
           Signed in as <strong>{profile?.full_name}</strong> ({profile?.email})
         </div>
         {children}
       </main>
+      <AppFooter />
     </div>
   );
 }

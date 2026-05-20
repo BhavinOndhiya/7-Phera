@@ -17,6 +17,7 @@ import {
 import { TimelineItem } from './TimelineItem';
 import { useTimeline } from '@/lib/hooks/useTimeline';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatDateLong } from '@/lib/utils/formatting';
 import type { TimelineItem as TimelineItemType } from '@/lib/types/database.types';
 
@@ -119,6 +120,8 @@ function TimelineItemForm({
   onOpenChange: (open: boolean) => void;
 }) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
     title: initial?.title ?? '',
@@ -154,9 +157,13 @@ function TimelineItemForm({
         }
         toast.success('Updated');
       } else {
+        if (!workspaceId) {
+          toast.error('Pick a workspace first');
+          return;
+        }
         const { error } = await supabase
           .from('timeline_items')
-          .insert(payload);
+          .insert({ ...payload, workspace_id: workspaceId });
         if (error) {
           toast.error(error.message);
           return;

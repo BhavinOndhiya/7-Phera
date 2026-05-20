@@ -58,7 +58,7 @@ export function SignupForm() {
           <Input
             id="full_name"
             name="full_name"
-            placeholder="Priya Sharma"
+            placeholder="Bhavin Ondhiya"
             required
             minLength={2}
             className="pl-9"

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import { budgetItemSchema } from '@/lib/utils/validation';
 import type {
   BudgetItem,
@@ -39,6 +40,8 @@ export function ExpenseForm({
   onDone,
 }: ExpenseFormProps) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [isPending, startTransition] = useTransition();
 
   const [form, setForm] = useState({
@@ -82,7 +85,13 @@ export function ExpenseForm({
         }
         toast.success('Item updated');
       } else {
-        const { error } = await supabase.from('budget_items').insert(parsed.data);
+        if (!workspaceId) {
+          toast.error('Pick a workspace first');
+          return;
+        }
+        const { error } = await supabase
+          .from('budget_items')
+          .insert({ ...parsed.data, workspace_id: workspaceId });
         if (error) {
           toast.error(error.message);
           return;

@@ -31,8 +31,8 @@ const COLUMNS: {
   {
     name: 'full_name',
     required: true,
-    description: "Person or family name. e.g. 'Priya Sharma' or 'The Verma Family'.",
-    example: 'Priya Sharma',
+    description: "Person or family name. e.g. 'Prachi Mehta' or 'The Patel Family'.",
+    example: 'Prachi Mehta',
   },
   {
     name: 'side',
@@ -87,12 +87,12 @@ const COLUMNS: {
 ];
 
 const SAMPLE_CSV = `full_name,side,relation,phone,email,address,age_group,plus_one,party_size
-Priya Sharma,bride,Cousin,+919876543210,priya@example.com,"12 MG Road, Mumbai",adult,true,1
-Arjun Mehta,groom,Friend,+919812345678,arjun@example.com,"Flat 4B, Whitefield, Bengaluru",adult,false,1
-The Verma Family,bride,Aunt,+919800001111,verma@example.com,"45 Park Street, Delhi",adult,false,5
-Patel Family,groom,Family Friend,+919800002222,,"Sector 21, Ahmedabad",adult,false,4
-Dadaji Sharma,bride,Grandparent,+919800003333,,,senior,false,1
-Aarav Kumar,groom,Nephew,,,,child,false,1
+Prachi Mehta,bride,Cousin,+919876543210,prachi.cousin@example.com,"12 MG Road, Mumbai",adult,true,1
+Rohan Joshi,groom,Friend,+919812345678,rohan@example.com,"Flat 4B, Whitefield, Bengaluru",adult,false,1
+The Mehta Family,bride,Aunt,+919800001111,mehta.family@example.com,"45 Park Street, Delhi",adult,false,5
+Joshi Family,groom,Family Friend,+919800002222,,"Sector 21, Ahmedabad",adult,false,4
+Dadaji Mehta,bride,Grandparent,+919800003333,,,senior,false,1
+Aarav Joshi,groom,Nephew,,,,child,false,1
 `;
 
 export function GuestImport({

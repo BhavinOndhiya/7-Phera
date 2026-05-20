@@ -163,7 +163,7 @@ export function GuestForm({ initial, eventId, onDone }: GuestFormProps) {
             value={form.full_name}
             onChange={(e) => setForm({ ...form, full_name: e.target.value })}
             placeholder={
-              isGroup ? 'e.g. The Sharma Family' : 'e.g. Priya Sharma'
+              isGroup ? 'e.g. The Patel Family' : 'e.g. Prachi Mehta'
             }
             required
           />

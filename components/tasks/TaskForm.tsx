@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
+import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   Task,
   Priority,
@@ -29,6 +30,8 @@ interface TaskFormProps {
 
 export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
   const supabase = createClient();
+  const ws = useOptionalWorkspace();
+  const workspaceId = ws?.activeWorkspaceId ?? null;
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
     title: initial?.title ?? '',
@@ -68,7 +71,13 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
         }
         toast.success('Task updated');
       } else {
-        const { error } = await supabase.from('tasks').insert(payload);
+        if (!workspaceId) {
+          toast.error('Pick a workspace first');
+          return;
+        }
+        const { error } = await supabase
+          .from('tasks')
+          .insert({ ...payload, workspace_id: workspaceId });
         if (error) {
           toast.error(error.message);
           return;
