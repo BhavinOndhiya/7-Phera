@@ -2,41 +2,10 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { Resend } from 'resend';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { brand, workspaceInvitation } from '@/lib/emails';
 import type { WorkspaceRole } from '@/lib/types/database.types';
 
 export const runtime = 'nodejs';
-
-function renderInviteEmail({
-  inviterName,
-  workspaceName,
-  role,
-  acceptUrl,
-}: {
-  inviterName: string;
-  workspaceName: string;
-  role: string;
-  acceptUrl: string;
-}) {
-  return `
-  <div style="font-family: Georgia, serif; max-width: 560px; margin: auto; color: #1f2937;">
-    <div style="background: linear-gradient(135deg, #fff1f2 0%, #fdf6e3 100%); padding: 32px; text-align: center; border-radius: 16px;">
-      <p style="color: #be185d; letter-spacing: 4px; text-transform: uppercase; font-size: 12px; margin: 0;">You're invited</p>
-      <h1 style="font-size: 30px; margin: 12px 0 6px; color: #9f1239;">${workspaceName}</h1>
-      <p style="color: #6b7280; margin: 0;">${inviterName} wants you to help plan their wedding</p>
-    </div>
-    <div style="padding: 28px 4px;">
-      <p>Hi there,</p>
-      <p>${inviterName} has invited you to join <strong>${workspaceName}</strong> on 7-Phera as a <strong>${role}</strong>.</p>
-      <p style="text-align: center; margin: 28px 0;">
-        <a href="${acceptUrl}" style="display: inline-block; background: #fb2e63; color: white; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-family: sans-serif; font-weight: 600;">Accept invitation</a>
-      </p>
-      <p style="color: #6b7280; font-size: 14px;">If the button doesn't work, copy this link:<br/>
-        <a href="${acceptUrl}" style="color: #be185d; word-break: break-all;">${acceptUrl}</a>
-      </p>
-      <p style="color: #9ca3af; font-size: 12px;">This invitation expires in 14 days.</p>
-    </div>
-  </div>`;
-}
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -131,12 +100,12 @@ export async function POST(request: Request) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
       const fromAddress =
-        process.env.RESEND_FROM ?? '7-Phera <invitations@resend.dev>';
+        process.env.RESEND_FROM ?? `${brand.name} <invitations@resend.dev>`;
       await resend.emails.send({
         from: fromAddress,
         to: email,
         subject: `${profile?.full_name ?? 'Someone'} invited you to ${workspace.name}`,
-        html: renderInviteEmail({
+        html: workspaceInvitation({
           inviterName: profile?.full_name ?? 'A friend',
           workspaceName: workspace.name,
           role,

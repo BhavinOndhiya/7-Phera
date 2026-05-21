@@ -116,7 +116,7 @@ export default function OnboardingPage() {
           <Heart className="h-7 w-7 text-rose-500" />
         </div>
         <h1 className="font-serif text-3xl md:text-4xl font-semibold">
-          Welcome to 7-Phera
+          Welcome to Saath Phere
         </h1>
         <p className="text-muted-foreground mt-2">
           Let&apos;s set up your wedding workspace.

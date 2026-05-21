@@ -180,6 +180,8 @@ components/
 
 lib/
   supabase/       # client.ts, server.ts, middleware.ts
+  emails/         # theme.ts + components.ts + templates/ for every Resend email
+                  # (guest invitation, workspace invitation). Single brand source.
   hooks/          # useAuth, useEvents, useGuests, useBudget, useVendors,
                   # useTasks, useTimeline, useDocuments, useGallery,
                   # useGifts, useBudgetAlerts
@@ -190,8 +192,22 @@ lib/
 messages/         # en.json, hi.json, gu.json (next-intl translations)
 i18n.ts           # next-intl request config
 public/           # manifest.json, sw.js, icons/
-supabase/         # SQL migrations
+supabase/
+  migrations/     # SQL migrations
+  templates/      # Branded HTML for Supabase auth emails (confirmation,
+                  # recovery, magic_link, invite, email_change, reauthentication)
+  config.toml     # Local-dev Supabase config + email template wiring
 ```
+
+### Editing emails
+
+| To change… | Edit… |
+|---|---|
+| Brand colours / fonts used by every email | [`lib/emails/theme.ts`](lib/emails/theme.ts) |
+| Shared header / button / footer building blocks | [`lib/emails/components.ts`](lib/emails/components.ts) |
+| Guest wedding invitation (Resend) | [`lib/emails/templates/guestInvitation.ts`](lib/emails/templates/guestInvitation.ts) |
+| Workspace collaborator invite (Resend) | [`lib/emails/templates/workspaceInvitation.ts`](lib/emails/templates/workspaceInvitation.ts) |
+| Supabase signup / reset / magic link / invite / email change / reauth emails | [`supabase/templates/*.html`](supabase/templates) — see the [README in that folder](supabase/templates/README.md) for deploy notes |
 
 ---
 

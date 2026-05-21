@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -15,11 +15,15 @@ import {
   UserMinus,
   UserPlus,
   CalendarDays,
+  Send,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -51,8 +55,9 @@ import {
 import { GuestForm } from './GuestForm';
 import { GuestQRCard } from './GuestQRCard';
 import { AddExistingGuestsDialog } from './AddExistingGuestsDialog';
+import { InvitationActions } from './InvitationActions';
 import { useGuests } from '@/lib/hooks/useGuests';
-import { useEvents } from '@/lib/hooks/useEvents';
+import { useEvents, useEvent } from '@/lib/hooks/useEvents';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { RSVP_STATUSES, SIDES } from '@/lib/constants';
 import type { Guest, Side, RsvpStatus } from '@/lib/types/database.types';
@@ -74,10 +79,12 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
     removeFromEvent,
   } = useGuests({ eventId });
   const { events } = useEvents();
+  const { event: scopedEvent } = useEvent(eventId ?? null);
   const { can } = useWorkspace();
   const canEdit = can('edit_guest');
   const canDelete = can('delete_guest');
   const canCreate = can('create_guest');
+  const canInvite = canEdit;
   const [search, setSearch] = useState('');
   const [sideFilter, setSideFilter] = useState<Side | 'all'>('all');
   const [rsvpFilter, setRsvpFilter] = useState<RsvpStatus | 'all'>('all');
@@ -86,6 +93,10 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [addExistingOpen, setAddExistingOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sendingSingleId, setSendingSingleId] = useState<string | null>(null);
+  const [, startSingleSendTransition] = useTransition();
 
   const eventsById = useMemo(() => {
     const m: Record<string, { id: string; name: string }> = {};
@@ -113,12 +124,102 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
     });
   }, [guests, search, sideFilter, rsvpFilter, eventFilter, eventId, guestEvents]);
 
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validIds = new Set(filtered.map((g) => g.id));
+      const next = new Set<string>();
+      let changed = false;
+      for (const id of prev) {
+        if (validIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [filtered]);
+
+  const filteredIds = useMemo(() => filtered.map((g) => g.id), [filtered]);
+  const selectedFilteredCount = useMemo(
+    () => filteredIds.reduce((n, id) => (selectedIds.has(id) ? n + 1 : n), 0),
+    [filteredIds, selectedIds]
+  );
+  const allFilteredSelected =
+    filteredIds.length > 0 && selectedFilteredCount === filteredIds.length;
+  const someFilteredSelected =
+    selectedFilteredCount > 0 && !allFilteredSelected;
+
+  const selectedGuests = useMemo(
+    () => guests.filter((g) => selectedIds.has(g.id)),
+    [guests, selectedIds]
+  );
+  const selectedWithEmailCount = selectedGuests.filter((g) => g.email).length;
+
+  function toggleSelectAllFiltered(value: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (value) {
+        for (const id of filteredIds) next.add(id);
+      } else {
+        for (const id of filteredIds) next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectOne(id: string, value: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  function sendSingleInvitation(guest: Guest) {
+    if (!eventId) {
+      toast.error('Open this guest list from an event to send invitations');
+      return;
+    }
+    if (!guest.email) {
+      toast.error('Guest has no email address');
+      return;
+    }
+    setSendingSingleId(guest.id);
+    startSingleSendTransition(async () => {
+      try {
+        const res = await fetch('/api/invitations/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId, guestIds: [guest.id] }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error ?? 'Failed to send invitation');
+          return;
+        }
+        if (data.sent?.length > 0) {
+          toast.success(`Invitation sent to ${guest.full_name}`);
+        } else {
+          const reason = data.failed?.[0]?.reason ?? 'unknown error';
+          toast.error(`Could not send: ${reason}`);
+        }
+      } finally {
+        setSendingSingleId(null);
+      }
+    });
+  }
+
   async function onRsvpChange(id: string, value: RsvpStatus) {
     const ok = await updateRsvp(id, value);
     if (ok) toast.success('RSVP updated');
   }
 
   const showEventsColumn = !eventId && events.length > 0;
+  const columnCount = (showEventsColumn ? 7 : 6) + 1;
 
   return (
     <div className="space-y-4">
@@ -156,7 +257,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
           )}
           {canCreate && (
             <Button variant="outline" onClick={() => setImportOpen(true)}>
-              Import CSV
+              Import CSV / Excel
             </Button>
           )}
           {canCreate && (
@@ -229,10 +330,59 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
         )}
       </div>
 
+      {canInvite && selectedIds.size > 0 && (
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/95 backdrop-blur px-4 py-2.5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-rose-500 text-white hover:bg-rose-500">
+              {selectedIds.size}
+            </Badge>
+            <span className="text-sm font-medium">selected</span>
+            <span className="text-xs text-muted-foreground">
+              · {selectedWithEmailCount} have email
+            </span>
+          </div>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5 mr-1" /> Clear
+            </Button>
+            <Button
+              size="sm"
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={() => setSendDialogOpen(true)}
+              disabled={selectedWithEmailCount === 0 && !eventId}
+            >
+              <Send className="h-3.5 w-3.5 mr-1.5" />
+              Send invitations
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
+              {canInvite && (
+                <TableHead className="w-[44px]">
+                  <Checkbox
+                    aria-label="Select all filtered guests"
+                    checked={
+                      allFilteredSelected
+                        ? true
+                        : someFilteredSelected
+                          ? 'indeterminate'
+                          : false
+                    }
+                    onCheckedChange={(v) => toggleSelectAllFiltered(v === true)}
+                    disabled={filteredIds.length === 0}
+                  />
+                </TableHead>
+              )}
               <TableHead>Name</TableHead>
               <TableHead>Side</TableHead>
               <TableHead className="hidden md:table-cell">Relation</TableHead>
@@ -248,7 +398,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             {loading && (
               <TableRow>
                 <TableCell
-                  colSpan={showEventsColumn ? 7 : 6}
+                  colSpan={canInvite ? columnCount : columnCount - 1}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Loading guests…
@@ -258,7 +408,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             {!loading && filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={showEventsColumn ? 7 : 6}
+                  colSpan={canInvite ? columnCount : columnCount - 1}
                   className="text-center py-12 text-muted-foreground"
                 >
                   {guests.length === 0
@@ -271,14 +421,37 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             )}
             {filtered.map((guest) => {
               const invitedEventIds = guestEvents[guest.id] ?? [];
+              const isSelected = selectedIds.has(guest.id);
               return (
-                <TableRow key={guest.id}>
+                <TableRow
+                  key={guest.id}
+                  data-state={isSelected ? 'selected' : undefined}
+                >
+                  {canInvite && (
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`Select ${guest.full_name}`}
+                        checked={isSelected}
+                        onCheckedChange={(v) =>
+                          toggleSelectOne(guest.id, v === true)
+                        }
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="font-medium flex items-center gap-1.5">
                       {guest.full_name}
                       {guest.party_size > 1 && (
                         <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 text-xs">
                           <Users className="h-3 w-3 mr-1" /> {guest.party_size}
+                        </Badge>
+                      )}
+                      {guest.invitation_status === 'sent' && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] border-emerald-200 text-emerald-700"
+                        >
+                          Invited
                         </Badge>
                       )}
                     </div>
@@ -372,7 +545,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                           eventName={eventName}
                         />
                       )}
-                      {(canEdit || canDelete) && (
+                      {(canEdit || canDelete || (canInvite && eventId)) && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -380,6 +553,30 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {canInvite && eventId && (
+                              <DropdownMenuItem
+                                onClick={() => sendSingleInvitation(guest)}
+                                disabled={
+                                  !guest.email ||
+                                  sendingSingleId === guest.id
+                                }
+                              >
+                                {sendingSingleId === guest.id ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Send className="h-4 w-4 mr-2" />
+                                )}
+                                Send invitation
+                                {!guest.email && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    no email
+                                  </span>
+                                )}
+                              </DropdownMenuItem>
+                            )}
+                            {canInvite && eventId && (canEdit || canDelete) && (
+                              <DropdownMenuSeparator />
+                            )}
                             {canEdit && (
                               <DropdownMenuItem onClick={() => setEditingGuest(guest)}>
                                 <Edit className="h-4 w-4 mr-2" /> Edit
@@ -459,7 +656,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Import guests from CSV</DialogTitle>
+            <DialogTitle>Import guests from CSV or Excel</DialogTitle>
           </DialogHeader>
           <GuestImport eventId={eventId} onDone={() => setImportOpen(false)} />
         </DialogContent>
@@ -470,6 +667,17 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
           eventId={eventId}
           open={addExistingOpen}
           onOpenChange={setAddExistingOpen}
+        />
+      )}
+
+      {canInvite && (
+        <InvitationActions
+          event={eventId ? scopedEvent ?? undefined : undefined}
+          guests={selectedGuests}
+          workspaceEvents={eventId ? undefined : events}
+          open={sendDialogOpen}
+          onOpenChange={setSendDialogOpen}
+          onSent={clearSelection}
         />
       )}
     </div>

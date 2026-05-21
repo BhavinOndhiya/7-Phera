@@ -50,7 +50,7 @@ export default async function AdminLayout({
           <div className="flex items-center gap-3 min-w-0">
             <Shield className="h-5 w-5 shrink-0" />
             <h1 className="font-serif text-lg font-semibold truncate">
-              7-Phera Admin
+              Saath Phere Admin
             </h1>
           </div>
           <div className="flex items-center gap-2">

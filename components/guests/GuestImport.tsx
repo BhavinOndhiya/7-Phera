@@ -319,6 +319,14 @@ export function GuestImport({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-900">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-rose-500" />
+        <p>
+          Importing only adds guests to your list — no invitations are sent. You
+          can send them later from the guest list by selecting guests and
+          clicking <span className="font-medium">Send invitations</span>.
+        </p>
+      </div>
       <div className="rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 text-center">
         <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
         <p className="mt-3 font-medium">Upload a CSV or Excel file</p>
