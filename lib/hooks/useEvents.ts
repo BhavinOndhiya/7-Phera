@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
+import { emitDataChanged, onDataChanged } from '@/lib/utils/dataEvents';
 import type {
   Event,
   InsertTables,
@@ -43,8 +44,10 @@ export function useEvents() {
         () => fetchEvents()
       )
       .subscribe();
+    const offBus = onDataChanged('events:changed', () => fetchEvents());
     return () => {
       supabase.removeChannel(channel);
+      offBus();
     };
   }, [supabase, fetchEvents]);
 
@@ -62,6 +65,7 @@ export function useEvents() {
       toast.error(error.message);
       return null;
     }
+    emitDataChanged('events:changed');
     toast.success('Event created');
     return data;
   }
@@ -75,6 +79,7 @@ export function useEvents() {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('events:changed');
     toast.success('Event updated');
     return true;
   }
@@ -85,6 +90,7 @@ export function useEvents() {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('events:changed');
     toast.success('Event deleted');
     return true;
   }

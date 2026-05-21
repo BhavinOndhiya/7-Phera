@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 
 export function DeleteEventButton({ id }: { id: string }) {
   const router = useRouter();
@@ -29,6 +30,7 @@ export function DeleteEventButton({ id }: { id: string }) {
         toast.error(error.message);
         return;
       }
+      emitDataChanged('events:changed');
       toast.success('Event deleted');
       setOpen(false);
       router.push('/events');

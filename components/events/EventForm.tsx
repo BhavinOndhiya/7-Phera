@@ -18,6 +18,7 @@ import {
 import { ThemePicker } from './ThemePicker';
 import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 import { EVENT_TYPES } from '@/lib/constants';
 import { eventSchema } from '@/lib/utils/validation';
 import type { Event, EventType } from '@/lib/types/database.types';
@@ -92,6 +93,7 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
           toast.error(error.message);
           return;
         }
+        emitDataChanged('events:changed');
         toast.success('Event updated');
         router.push(`/events/${initial.id}`);
         router.refresh();
@@ -109,6 +111,7 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
           toast.error(error.message);
           return;
         }
+        emitDataChanged('events:changed');
         toast.success('Event created');
         router.push(`/events/${data!.id}`);
         router.refresh();

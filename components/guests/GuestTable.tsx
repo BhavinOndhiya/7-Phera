@@ -59,6 +59,7 @@ import { InvitationActions } from './InvitationActions';
 import { useGuests } from '@/lib/hooks/useGuests';
 import { useEvents, useEvent } from '@/lib/hooks/useEvents';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 import { RSVP_STATUSES, SIDES } from '@/lib/constants';
 import type { Guest, Side, RsvpStatus } from '@/lib/types/database.types';
 import { GuestImport } from './GuestImport';
@@ -202,6 +203,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
           return;
         }
         if (data.sent?.length > 0) {
+          emitDataChanged('guests:changed');
           toast.success(`Invitation sent to ${guest.full_name}`);
         } else {
           const reason = data.failed?.[0]?.reason ?? 'unknown error';

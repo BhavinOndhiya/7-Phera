@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import type { Guest, Event } from '@/lib/types/database.types';
 import { formatDateLong } from '@/lib/utils/formatting';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 
 interface InvitationActionsProps {
   event?: Event;
@@ -85,6 +86,7 @@ export function InvitationActions({
         toast.error(data.error ?? 'Failed to send invitations');
         return;
       }
+      if (data.sent?.length > 0) emitDataChanged('guests:changed');
       toast.success(
         `Sent ${data.sent.length} invitation${data.sent.length === 1 ? '' : 's'}${
           data.failed.length > 0 ? `, ${data.failed.length} failed` : ''

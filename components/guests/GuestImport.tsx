@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 import type { InsertTables, Side, AgeGroup } from '@/lib/types/database.types';
 
 interface CsvRow {
@@ -310,8 +311,10 @@ export function GuestImport({
         await supabase
           .from('event_guests')
           .insert(data.map((g) => ({ event_id: eventId, guest_id: g.id })));
+        emitDataChanged('event_guests:changed');
       }
 
+      emitDataChanged('guests:changed');
       toast.success(`Imported ${data?.length ?? 0} guests`);
       onDone?.();
     });

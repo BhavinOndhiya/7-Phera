@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
+import { emitDataChanged, onDataChanged } from '@/lib/utils/dataEvents';
 import type {
   Guest,
   InsertTables,
@@ -105,8 +106,13 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
         () => fetchGuests()
       )
       .subscribe();
+    const offBus = onDataChanged(
+      ['guests:changed', 'event_guests:changed'],
+      () => fetchGuests()
+    );
     return () => {
       supabase.removeChannel(channel);
+      offBus();
     };
   }, [supabase, fetchGuests]);
 
@@ -131,7 +137,9 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       await supabase
         .from('event_guests')
         .insert({ event_id: options.eventId, guest_id: data.id });
+      emitDataChanged('event_guests:changed');
     }
+    emitDataChanged('guests:changed');
     toast.success(`${data?.full_name ?? 'Guest'} added`);
     return data;
   }
@@ -145,6 +153,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('guests:changed');
     toast.success('Guest updated');
     return true;
   }
@@ -155,6 +164,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('guests:changed');
     toast.success('Guest removed');
     return true;
   }
@@ -168,6 +178,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('guests:changed');
     return true;
   }
 
@@ -179,6 +190,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('event_guests:changed');
     return true;
   }
 
@@ -195,6 +207,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('event_guests:changed');
     toast.success(
       `Invited ${guestIds.length} guest${guestIds.length === 1 ? '' : 's'}`
     );
@@ -211,6 +224,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       toast.error(error.message);
       return false;
     }
+    emitDataChanged('event_guests:changed');
     toast.success('Removed from event');
     return true;
   }

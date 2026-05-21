@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 import { guestSchema } from '@/lib/utils/validation';
 import { DIETARY_OPTIONS, RELATIONS } from '@/lib/constants';
 import type { Guest, Side, AgeGroup, RsvpStatus } from '@/lib/types/database.types';
@@ -98,6 +99,7 @@ export function GuestForm({ initial, eventId, onDone }: GuestFormProps) {
           toast.error(error.message);
           return;
         }
+        emitDataChanged('guests:changed');
         toast.success('Guest updated');
         onDone?.(data);
       } else {
@@ -118,7 +120,9 @@ export function GuestForm({ initial, eventId, onDone }: GuestFormProps) {
           await supabase
             .from('event_guests')
             .insert({ event_id: eventId, guest_id: data.id });
+          emitDataChanged('event_guests:changed');
         }
+        emitDataChanged('guests:changed');
         toast.success(`${data!.full_name} added`);
         onDone?.(data);
       }
