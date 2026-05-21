@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       continue;
     }
     try {
-      await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: fromAddress,
         to: guest.email,
         ...(replyTo ? { reply_to: replyTo } : {}),
@@ -82,12 +82,36 @@ export async function POST(request: Request) {
           rsvpUrl: `${origin}/checkin/${eventId}?guest=${guest.id}`,
         }),
       });
+
+      if (error) {
+        console.error('[invitations/send] Resend rejected', {
+          guestId: guest.id,
+          from: fromAddress,
+          to: guest.email,
+          error,
+        });
+        failed.push({
+          guestId: guest.id,
+          reason: `${error.name}: ${error.message}`,
+        });
+        continue;
+      }
+
       await supabase
         .from('guests')
         .update({ invitation_status: 'sent' })
         .eq('id', guest.id);
       sent.push(guest.id);
+      console.log('[invitations/send] sent', {
+        guestId: guest.id,
+        to: guest.email,
+        resendId: data?.id,
+      });
     } catch (e) {
+      console.error('[invitations/send] network error', {
+        guestId: guest.id,
+        error: e,
+      });
       failed.push({
         guestId: guest.id,
         reason: e instanceof Error ? e.message : 'unknown',

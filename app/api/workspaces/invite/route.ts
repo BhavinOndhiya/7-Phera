@@ -96,13 +96,14 @@ export async function POST(request: Request) {
   const acceptUrl = `${origin}/invite/accept?token=${invitation.token}`;
 
   let emailSent = false;
+  let emailError: string | undefined;
   if (process.env.RESEND_API_KEY) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
       const fromAddress =
         process.env.RESEND_FROM ?? `${brand.name} <invitations@resend.dev>`;
       const replyTo = process.env.RESEND_REPLY_TO?.trim() || undefined;
-      await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: fromAddress,
         to: email,
         ...(replyTo ? { reply_to: replyTo } : {}),
@@ -114,9 +115,16 @@ export async function POST(request: Request) {
           acceptUrl,
         }),
       });
-      emailSent = true;
+      if (error) {
+        console.error('[invite] Resend rejected', { from: fromAddress, to: email, error });
+        emailError = `${error.name}: ${error.message}`;
+      } else {
+        emailSent = true;
+        console.log('[invite] sent', { to: email, resendId: data?.id });
+      }
     } catch (e) {
-      console.error('[invite] email send failed', e);
+      console.error('[invite] network error', e);
+      emailError = e instanceof Error ? e.message : 'unknown';
     }
   }
 
@@ -125,5 +133,6 @@ export async function POST(request: Request) {
     invitation: { id: invitation.id, token: invitation.token },
     acceptUrl,
     emailSent,
+    emailError,
   });
 }

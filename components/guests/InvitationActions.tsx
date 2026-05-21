@@ -86,12 +86,31 @@ export function InvitationActions({
         toast.error(data.error ?? 'Failed to send invitations');
         return;
       }
-      if (data.sent?.length > 0) emitDataChanged('guests:changed');
-      toast.success(
-        `Sent ${data.sent.length} invitation${data.sent.length === 1 ? '' : 's'}${
-          data.failed.length > 0 ? `, ${data.failed.length} failed` : ''
-        }`
-      );
+
+      const sentCount = data.sent?.length ?? 0;
+      const failures: { guestId: string; reason: string }[] = data.failed ?? [];
+
+      if (sentCount > 0) emitDataChanged('guests:changed');
+
+      if (sentCount > 0 && failures.length === 0) {
+        toast.success(
+          `Sent ${sentCount} invitation${sentCount === 1 ? '' : 's'}`
+        );
+      } else if (sentCount > 0 && failures.length > 0) {
+        const firstReason = failures[0]?.reason ?? 'unknown';
+        toast.warning(
+          `Sent ${sentCount}, ${failures.length} failed — ${firstReason}`,
+          { duration: 10000 }
+        );
+      } else if (failures.length > 0) {
+        const firstReason = failures[0]?.reason ?? 'unknown';
+        toast.error(`Failed to send: ${firstReason}`, { duration: 10000 });
+        return;
+      } else {
+        toast.error('No invitations were sent');
+        return;
+      }
+
       setOpen(false);
       onSent?.();
     });
