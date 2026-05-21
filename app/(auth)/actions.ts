@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { loginSchema, signupSchema } from '@/lib/utils/validation';
+import { resolveAppOrigin } from '@/lib/utils/appUrl';
 
 export type ActionResult =
   | { ok: true; redirectTo?: string }
@@ -179,7 +180,7 @@ export async function forgotPasswordAction(
   if (!email) return { ok: false, error: 'Email required' };
 
   const supabase = createClient();
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const origin = resolveAppOrigin();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/reset-password`,
   });

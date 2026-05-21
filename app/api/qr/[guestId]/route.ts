@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import QRCode from 'qrcode';
+import { resolveAppOrigin } from '@/lib/utils/appUrl';
 
 export const runtime = 'nodejs';
 
@@ -9,8 +10,7 @@ export async function GET(
 ) {
   const { searchParams } = new URL(request.url);
   const eventId = searchParams.get('eventId');
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const origin = resolveAppOrigin(request);
 
   const checkInUrl = `${origin}/checkin/${eventId ?? ''}?guest=${params.guestId}`;
 

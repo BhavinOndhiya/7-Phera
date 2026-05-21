@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { resolveAppOrigin } from '@/lib/utils/appUrl';
 
 export const runtime = 'nodejs';
 
@@ -32,8 +33,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createServiceRoleClient();
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const origin = resolveAppOrigin(request);
 
   const { data: invite, error: inviteError } = await admin.auth.admin
     .inviteUserByEmail(email, {

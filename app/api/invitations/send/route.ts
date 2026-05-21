@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@/lib/supabase/server';
 import { brand, guestInvitation } from '@/lib/emails';
+import { resolveAppOrigin } from '@/lib/utils/appUrl';
 
 export const runtime = 'nodejs';
 
@@ -49,8 +50,7 @@ export async function POST(request: Request) {
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const origin = resolveAppOrigin(request);
   const fromAddress =
     process.env.RESEND_FROM ?? `${brand.name} <invitations@resend.dev>`;
   const replyTo = process.env.RESEND_REPLY_TO?.trim() || undefined;

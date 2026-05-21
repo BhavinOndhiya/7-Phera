@@ -91,8 +91,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  const origin = resolveAppOrigin(request);
   const acceptUrl = `${origin}/invite/accept?token=${invitation.token}`;
 
   let emailSent = false;
