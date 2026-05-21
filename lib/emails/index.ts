@@ -6,9 +6,12 @@ export {
   brandMutedLink,
   brandOtpBlock,
   brandFooter,
+  brandMonogram,
+  brandDetailTiles,
+  brandHeartDivider,
   escapeHtml,
 } from './components';
-export type { BrandLayoutOptions } from './components';
+export type { BrandLayoutOptions, BrandDetailTile } from './components';
 export {
   guestInvitation,
   type GuestInvitationProps,

@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { Resend } from 'resend';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { brand, workspaceInvitation } from '@/lib/emails';
+import { resolveAppOrigin } from '@/lib/utils/appUrl';
 import type { WorkspaceRole } from '@/lib/types/database.types';
 
 export const runtime = 'nodejs';
