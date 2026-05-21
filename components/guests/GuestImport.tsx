@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Upload, Loader2, FileText, Download, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,15 +12,78 @@ import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type { InsertTables, Side, AgeGroup } from '@/lib/types/database.types';
 
 interface CsvRow {
-  full_name?: string;
-  side?: string;
-  relation?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  age_group?: string;
-  plus_one?: string;
-  party_size?: string;
+  full_name?: string | number | null;
+  side?: string | null;
+  relation?: string | null;
+  phone?: string | number | null;
+  email?: string | null;
+  address?: string | null;
+  age_group?: string | null;
+  plus_one?: string | boolean | number | null;
+  party_size?: string | number | null;
+}
+
+const HEADER_ALIASES: Record<string, keyof CsvRow> = {
+  full_name: 'full_name',
+  fullname: 'full_name',
+  name: 'full_name',
+  guest: 'full_name',
+  guest_name: 'full_name',
+  side: 'side',
+  party_side: 'side',
+  relation: 'relation',
+  relationship: 'relation',
+  phone: 'phone',
+  phone_number: 'phone',
+  mobile: 'phone',
+  contact: 'phone',
+  email: 'email',
+  email_address: 'email',
+  address: 'address',
+  age_group: 'age_group',
+  age: 'age_group',
+  plus_one: 'plus_one',
+  plusone: 'plus_one',
+  party_size: 'party_size',
+  partysize: 'party_size',
+  party: 'party_size',
+  group_size: 'party_size',
+};
+
+function normalizeHeader(raw: unknown): keyof CsvRow | null {
+  if (raw == null) return null;
+  const key = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+  return HEADER_ALIASES[key] ?? null;
+}
+
+function normalizeRows(rawRows: Record<string, unknown>[]): CsvRow[] {
+  return rawRows.map((raw) => {
+    const out: CsvRow = {};
+    for (const [k, v] of Object.entries(raw)) {
+      const mapped = normalizeHeader(k);
+      if (!mapped) continue;
+      if (v === undefined || v === null || v === '') continue;
+      (out as Record<string, unknown>)[mapped] = v;
+    }
+    return out;
+  });
+}
+
+function asString(v: unknown): string | undefined {
+  if (v === undefined || v === null) return undefined;
+  const s = String(v).trim();
+  return s === '' ? undefined : s;
+}
+
+function asBool(v: unknown): boolean {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  const s = asString(v)?.toLowerCase();
+  return s === 'true' || s === 'yes' || s === 'y' || s === '1';
 }
 
 const COLUMNS: {
@@ -113,18 +177,55 @@ export function GuestImport({
 
   function parseFile(file: File) {
     setFileName(file.name);
-    Papa.parse<CsvRow>(file, {
+    const lower = file.name.toLowerCase();
+    const isExcel = lower.endsWith('.xlsx') || lower.endsWith('.xls');
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: 'array' });
+          const sheetName = wb.SheetNames[0];
+          if (!sheetName) {
+            toast.error('Excel file has no sheets');
+            return;
+          }
+          const sheet = wb.Sheets[sheetName];
+          const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+            sheet,
+            { defval: '', raw: false }
+          );
+          const normalized = normalizeRows(rawRows).filter((r) =>
+            Object.values(r).some((v) => v !== undefined && v !== null && v !== '')
+          );
+          setRows(normalized);
+          toast.success(`Found ${normalized.length} rows`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'unknown error';
+          toast.error(`Excel parse failed: ${msg}`);
+        }
+      };
+      reader.onerror = () => toast.error('Failed to read file');
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    Papa.parse<Record<string, unknown>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        setRows(results.data);
-        toast.success(`Found ${results.data.length} rows`);
+        const normalized = normalizeRows(results.data).filter((r) =>
+          Object.values(r).some((v) => v !== undefined && v !== null && v !== '')
+        );
+        setRows(normalized);
+        toast.success(`Found ${normalized.length} rows`);
       },
       error: (err) => toast.error(`CSV parse failed: ${err.message}`),
     });
   }
 
-  function downloadSample() {
+  function downloadCsvSample() {
     const blob = new Blob([SAMPLE_CSV], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -134,6 +235,30 @@ export function GuestImport({
     URL.revokeObjectURL(url);
   }
 
+  function downloadXlsxSample() {
+    const headers = COLUMNS.map((c) => c.name);
+    const sampleRows = Papa.parse<Record<string, string>>(SAMPLE_CSV, {
+      header: true,
+      skipEmptyLines: true,
+    }).data;
+    const aoa: (string | number | boolean)[][] = [headers as string[]];
+    for (const r of sampleRows) {
+      aoa.push(
+        headers.map((h) => {
+          const v = r[h] ?? '';
+          if (h === 'plus_one') return v.toLowerCase() === 'true';
+          if (h === 'party_size') return Number(v) || 1;
+          return v;
+        })
+      );
+    }
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = headers.map(() => ({ wch: 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Guests');
+    XLSX.writeFile(wb, 'guests-sample.xlsx');
+  }
+
   function doImport() {
     if (!workspaceId) {
       toast.error('Pick a workspace first');
@@ -141,10 +266,11 @@ export function GuestImport({
     }
     startTransition(async () => {
       const inserts: InsertTables<'guests'>[] = rows
-        .filter((r) => r.full_name && r.relation)
+        .filter((r) => asString(r.full_name) && asString(r.relation))
         .map((r) => {
-          const side: Side = r.side?.toLowerCase() === 'groom' ? 'groom' : 'bride';
-          const ageRaw = r.age_group?.toLowerCase();
+          const sideRaw = asString(r.side)?.toLowerCase();
+          const side: Side = sideRaw === 'groom' ? 'groom' : 'bride';
+          const ageRaw = asString(r.age_group)?.toLowerCase();
           const age_group: AgeGroup =
             ageRaw === 'child' || ageRaw === 'senior' ? ageRaw : 'adult';
           const parsedPartySize = Number(r.party_size ?? 1);
@@ -153,15 +279,14 @@ export function GuestImport({
             Math.min(50, isFinite(parsedPartySize) ? parsedPartySize : 1)
           );
           return {
-            full_name: r.full_name!.trim(),
+            full_name: asString(r.full_name)!,
             side,
-            relation: r.relation!.trim(),
-            phone: r.phone?.trim() || null,
-            email: r.email?.trim() || null,
-            address: r.address?.trim() || null,
+            relation: asString(r.relation)!,
+            phone: asString(r.phone) ?? null,
+            email: asString(r.email) ?? null,
+            address: asString(r.address) ?? null,
             age_group,
-            plus_one:
-              r.plus_one?.toLowerCase() === 'true' || r.plus_one === '1',
+            plus_one: asBool(r.plus_one),
             party_size,
             workspace_id: workspaceId,
           };
@@ -196,7 +321,7 @@ export function GuestImport({
     <div className="space-y-4">
       <div className="rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 text-center">
         <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-        <p className="mt-3 font-medium">Upload a CSV file</p>
+        <p className="mt-3 font-medium">Upload a CSV or Excel file</p>
         <p className="text-xs text-muted-foreground mt-1">
           Required: <span className="font-mono">full_name</span>,{' '}
           <span className="font-mono">side</span>,{' '}
@@ -209,17 +334,20 @@ export function GuestImport({
           <span className="font-mono">party_size</span>
         </p>
         <p className="text-[11px] text-muted-foreground mt-1">
-          Tip: Excel users — fill in your sheet, then{' '}
-          <span className="font-medium">File → Save As → CSV (UTF-8)</span>.
+          Supports <span className="font-medium">.csv</span>,{' '}
+          <span className="font-medium">.xlsx</span> and{' '}
+          <span className="font-medium">.xls</span>. Column headers must match
+          the names above (case-insensitive).
         </p>
         <input
           ref={inputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) parseFile(file);
+            e.target.value = '';
           }}
         />
         <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
@@ -229,8 +357,11 @@ export function GuestImport({
           >
             Choose file
           </Button>
-          <Button variant="link" size="sm" onClick={downloadSample}>
-            <Download className="h-3 w-3 mr-1" /> Download sample
+          <Button variant="link" size="sm" onClick={downloadXlsxSample}>
+            <Download className="h-3 w-3 mr-1" /> Excel sample
+          </Button>
+          <Button variant="link" size="sm" onClick={downloadCsvSample}>
+            <Download className="h-3 w-3 mr-1" /> CSV sample
           </Button>
           <Button
             variant="link"
@@ -304,12 +435,27 @@ export function GuestImport({
             </thead>
             <tbody>
               {rows.slice(0, 20).map((row, i) => {
+                const name = asString(row.full_name);
+                const side = asString(row.side);
+                const relation = asString(row.relation);
                 const size = Number(row.party_size ?? 1) || 1;
                 return (
                   <tr key={i} className="border-t">
-                    <td className="p-2">{row.full_name}</td>
-                    <td className="p-2 capitalize">{row.side}</td>
-                    <td className="p-2">{row.relation}</td>
+                    <td className="p-2">
+                      {name ?? (
+                        <span className="text-rose-500 italic">missing</span>
+                      )}
+                    </td>
+                    <td className="p-2 capitalize">
+                      {side ?? (
+                        <span className="text-muted-foreground italic">—</span>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {relation ?? (
+                        <span className="text-rose-500 italic">missing</span>
+                      )}
+                    </td>
                     <td className="p-2">
                       {size > 1 ? `${size} people` : '1'}
                     </td>
@@ -328,19 +474,35 @@ export function GuestImport({
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2 border-t">
-        <Button variant="outline" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button
-          onClick={doImport}
-          disabled={rows.length === 0 || isPending}
-          className="bg-rose-500 hover:bg-rose-600"
-        >
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Import {rows.length > 0 ? `${rows.length} guests` : ''}
-        </Button>
-      </div>
+      {(() => {
+        const validCount = rows.filter(
+          (r) => asString(r.full_name) && asString(r.relation)
+        ).length;
+        return (
+          <div className="flex flex-col gap-2 pt-2 border-t sm:flex-row sm:items-center sm:justify-between">
+            {rows.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {validCount} of {rows.length} rows ready to import
+                {validCount < rows.length &&
+                  ` · ${rows.length - validCount} skipped (missing full_name or relation)`}
+              </p>
+            )}
+            <div className="flex justify-end gap-2 sm:ml-auto">
+              <Button variant="outline" onClick={onDone}>
+                Cancel
+              </Button>
+              <Button
+                onClick={doImport}
+                disabled={validCount === 0 || isPending}
+                className="bg-rose-500 hover:bg-rose-600"
+              >
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import {validCount > 0 ? `${validCount} guests` : ''}
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
