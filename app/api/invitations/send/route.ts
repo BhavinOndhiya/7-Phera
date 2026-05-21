@@ -53,6 +53,7 @@ export async function POST(request: Request) {
     process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
   const fromAddress =
     process.env.RESEND_FROM ?? `${brand.name} <invitations@resend.dev>`;
+  const replyTo = process.env.RESEND_REPLY_TO?.trim() || undefined;
 
   const sent: string[] = [];
   const failed: { guestId: string; reason: string }[] = [];
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
       await resend.emails.send({
         from: fromAddress,
         to: guest.email,
+        ...(replyTo ? { reply_to: replyTo } : {}),
         subject: `You're invited: ${event.name}`,
         html: guestInvitation({
           guestName: guest.full_name,

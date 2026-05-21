@@ -237,6 +237,7 @@ In Supabase Auth → **URL Configuration**:
 | `NEXT_PUBLIC_APP_URL` | recommended | absolute URLs in emails / QR codes / social share |
 | `RESEND_API_KEY` | optional | email invitations |
 | `RESEND_FROM` | optional | sender address (default `invitations@resend.dev`) |
+| `RESEND_REPLY_TO` | optional | inbox that receives guest replies. If unset, replies go back to the `RESEND_FROM` address — which may bounce if you don't have a real mailbox there. |
 | `OPENAI_API_KEY` | optional | AI budget recommendations |
 | `RAZORPAY_KEY_ID` | optional | Razorpay order creation |
 | `RAZORPAY_KEY_SECRET` | optional | Razorpay signature verification |

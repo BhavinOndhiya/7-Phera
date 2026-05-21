@@ -101,9 +101,11 @@ export async function POST(request: Request) {
       const resend = new Resend(process.env.RESEND_API_KEY);
       const fromAddress =
         process.env.RESEND_FROM ?? `${brand.name} <invitations@resend.dev>`;
+      const replyTo = process.env.RESEND_REPLY_TO?.trim() || undefined;
       await resend.emails.send({
         from: fromAddress,
         to: email,
+        ...(replyTo ? { reply_to: replyTo } : {}),
         subject: `${profile?.full_name ?? 'Someone'} invited you to ${workspace.name}`,
         html: workspaceInvitation({
           inviterName: profile?.full_name ?? 'A friend',
