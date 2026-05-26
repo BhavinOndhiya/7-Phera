@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Heart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { eventStartDateTime } from '@/lib/utils/eventSchedule';
 
 interface LiveCountdownProps {
   targetDate: string;
+  /** Postgres TIME / HTML time value — countdown targets this moment on the event date */
+  startTime?: string | null;
   eventName?: string;
 }
 
@@ -20,8 +23,12 @@ function diff(target: number) {
   return { ms, days, hours, minutes, seconds };
 }
 
-export function LiveCountdown({ targetDate, eventName }: LiveCountdownProps) {
-  const target = new Date(targetDate).getTime();
+export function LiveCountdown({
+  targetDate,
+  startTime,
+  eventName,
+}: LiveCountdownProps) {
+  const target = eventStartDateTime(targetDate, startTime).getTime();
   const [time, setTime] = useState(() => diff(target));
   const t = useTranslations('Countdown');
 

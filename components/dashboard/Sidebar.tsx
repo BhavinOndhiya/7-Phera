@@ -17,6 +17,7 @@ import {
   Settings,
   Heart,
   ScanLine,
+  UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
   { href: '/events', key: 'events', icon: Calendar },
   { href: '/guests', key: 'guests', icon: Users },
+  { href: '/checkins', key: 'checkins', icon: UserCheck },
   { href: '/scan', key: 'scanner', icon: ScanLine },
   { href: '/budget', key: 'budget', icon: Wallet },
   { href: '/vendors', key: 'vendors', icon: Store },

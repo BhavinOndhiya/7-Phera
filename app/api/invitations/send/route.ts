@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { brand, generateRsvpQrBase64, guestInvitation } from '@/lib/emails';
 import { resolveAppOrigin } from '@/lib/utils/appUrl';
 import { buildGuestPassUrl, buildGuestRsvpUrl } from '@/lib/utils/guestLinks';
+import { formatEventWhen } from '@/lib/utils/eventSchedule';
 
 const QR_CID = 'rsvp-qr';
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   const [{ data: event }, { data: guests }] = await Promise.all([
     supabase
       .from('events')
-      .select('name, event_date, venue')
+      .select('name, event_date, start_time, end_time, venue, venue_address')
       .eq('id', eventId)
       .maybeSingle(),
     supabase
@@ -120,12 +121,11 @@ export async function POST(request: Request) {
         html: guestInvitation({
           guestName: guest.full_name,
           eventName: event.name,
-          eventDate: new Date(event.event_date).toLocaleDateString('en-IN', {
-            weekday: 'long',
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric',
-          }),
+          eventDate: formatEventWhen(
+            event.event_date,
+            event.start_time,
+            event.end_time
+          ),
           venue: event.venue,
           rsvpUrl,
           qrCid,

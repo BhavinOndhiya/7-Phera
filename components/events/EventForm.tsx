@@ -39,6 +39,8 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
     name: initial?.name ?? '',
     event_type: (initial?.event_type ?? 'wedding') as EventType,
     event_date: initial?.event_date ?? '',
+    start_time: initial?.start_time?.slice(0, 5) ?? '',
+    end_time: initial?.end_time?.slice(0, 5) ?? '',
     venue: initial?.venue ?? '',
     venue_address: initial?.venue_address ?? '',
     estimated_guests: initial?.estimated_guests?.toString() ?? '',
@@ -75,6 +77,8 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
         name: parsed.data.name,
         event_type: parsed.data.event_type,
         event_date: parsed.data.event_date,
+        start_time: parsed.data.start_time || null,
+        end_time: parsed.data.end_time || null,
         venue: parsed.data.venue || null,
         venue_address: parsed.data.venue_address || null,
         estimated_guests: parsed.data.estimated_guests ?? null,
@@ -170,6 +174,29 @@ export function EventForm({ initial, onCancel }: EventFormProps) {
               value={form.event_date}
               onChange={(e) => setForm({ ...form, event_date: e.target.value })}
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="start_time">Start time</Label>
+            <Input
+              id="start_time"
+              type="time"
+              value={form.start_time}
+              onChange={(e) => setForm({ ...form, start_time: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown on invitations and guest calendar links
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="end_time">End time (optional)</Label>
+            <Input
+              id="end_time"
+              type="time"
+              value={form.end_time}
+              onChange={(e) => setForm({ ...form, end_time: e.target.value })}
             />
           </div>
 

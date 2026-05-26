@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate, daysUntil } from '@/lib/utils/formatting';
+import { formatTime12h } from '@/lib/utils/eventSchedule';
 import { EVENT_TYPES } from '@/lib/constants';
 import type { Event } from '@/lib/types/database.types';
 
@@ -76,7 +77,12 @@ export function EventCard({ event }: EventCardProps) {
         <div className="space-y-1.5 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Calendar className="h-3.5 w-3.5" />
-            <span>{formatDate(event.event_date)}</span>
+            <span>
+              {formatDate(event.event_date)}
+              {event.start_time
+                ? ` · ${formatTime12h(event.start_time)}`
+                : ''}
+            </span>
           </div>
           {event.venue && (
             <div className="flex items-center gap-2 text-muted-foreground">

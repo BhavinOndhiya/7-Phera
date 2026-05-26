@@ -24,8 +24,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { LiveCountdown } from '@/components/dashboard/LiveCountdown';
 import { ShareButtons } from '@/components/shared/ShareButtons';
+import { formatEventWhen } from '@/lib/utils/eventSchedule';
 import {
-  formatDateLong,
   formatINRShort,
   daysUntil,
 } from '@/lib/utils/formatting';
@@ -217,7 +217,11 @@ export default async function EventDetailPage({
       </div>
 
       {days >= 0 && (
-        <LiveCountdown targetDate={event.event_date} eventName={event.name} />
+        <LiveCountdown
+          targetDate={event.event_date}
+          startTime={event.start_time}
+          eventName={event.name}
+        />
       )}
 
       <Card>
@@ -228,7 +232,11 @@ export default async function EventDetailPage({
               <div>
                 <p className="font-medium">When</p>
                 <p className="text-sm text-muted-foreground">
-                  {formatDateLong(event.event_date)}
+                  {formatEventWhen(
+                    event.event_date,
+                    event.start_time,
+                    event.end_time
+                  )}
                 </p>
               </div>
             </div>

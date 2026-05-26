@@ -5,7 +5,11 @@ import Image from 'next/image';
 import { Download, Loader2, QrCode, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatDateLong } from '@/lib/utils/formatting';
+import { AddToGoogleCalendarButton } from '@/components/events/AddToGoogleCalendarButton';
+import {
+  canAddToCalendar,
+  formatEventWhen,
+} from '@/lib/utils/eventSchedule';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -15,7 +19,14 @@ interface EntryPassClientProps {
 }
 
 interface LookupData {
-  event: { name: string; event_date: string; venue: string | null };
+  event: {
+    name: string;
+    event_date: string;
+    start_time: string | null;
+    end_time: string | null;
+    venue: string | null;
+    venue_address: string | null;
+  };
   guest: {
     full_name: string;
     side: string;
@@ -98,7 +109,11 @@ export function EntryPassClient({ eventId, guestId }: EntryPassClientProps) {
           <div>
             <p className="font-medium">{event.name}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {formatDateLong(event.event_date)}
+              {formatEventWhen(
+                event.event_date,
+                event.start_time,
+                event.end_time
+              )}
             </p>
             {event.venue && (
               <p className="text-sm text-muted-foreground">{event.venue}</p>
@@ -135,6 +150,9 @@ export function EntryPassClient({ eventId, guestId }: EntryPassClientProps) {
           <p className="text-xs text-muted-foreground capitalize">
             RSVP: {guest.rsvp_status.replace('_', ' ')}
           </p>
+          {canAddToCalendar(guest.rsvp_status) && (
+            <AddToGoogleCalendarButton event={event} fullWidth className="mt-2" />
+          )}
         </CardContent>
       </Card>
       <Button variant="outline" className="w-full" asChild>

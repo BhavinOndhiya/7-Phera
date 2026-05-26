@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDateLong } from '@/lib/utils/formatting';
 import type { Event, Guest } from '@/lib/types/database.types';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 
 interface AttendanceRow {
   guest_id: string;
@@ -52,6 +53,7 @@ export function CheckinClient({
       toast.error(data.error ?? 'Failed to update check-in');
       return false;
     }
+    emitDataChanged('event_guests:changed');
     return true;
   }
 

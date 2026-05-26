@@ -2,10 +2,11 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, FileDown, ScanLine } from 'lucide-react';
+import { ArrowLeft, FileDown, ScanLine, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GuestTable } from '@/components/guests/GuestTable';
 import { RSVPTracker } from '@/components/guests/RSVPTracker';
+import { AttendanceTracker } from '@/components/guests/AttendanceTracker';
 import { InvitationActions } from '@/components/guests/InvitationActions';
 import { useGuests } from '@/lib/hooks/useGuests';
 import { useEvent } from '@/lib/hooks/useEvents';
@@ -18,7 +19,7 @@ export default function EventGuestsPage({
   const resolvedParams =
     params instanceof Promise ? use(params) : params;
   const { event } = useEvent(resolvedParams.id);
-  const { guests } = useGuests({ eventId: resolvedParams.id });
+  const { guests, attendance } = useGuests({ eventId: resolvedParams.id });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -38,6 +39,12 @@ export default function EventGuestsPage({
         </div>
         <div className="flex flex-wrap gap-2">
           {event && <InvitationActions event={event} guests={guests} />}
+          <Button asChild variant="outline">
+            <Link href={`/checkins?event=${resolvedParams.id}`}>
+              <UserCheck className="h-4 w-4 mr-2" />
+              Who&apos;s here
+            </Link>
+          </Button>
           <Button
             asChild
             variant="outline"
@@ -61,6 +68,7 @@ export default function EventGuestsPage({
       </div>
 
       <RSVPTracker guests={guests} />
+      <AttendanceTracker guests={guests} attendance={attendance} />
 
       <GuestTable eventId={resolvedParams.id} eventName={event?.name} />
     </div>

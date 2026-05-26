@@ -87,6 +87,8 @@ export type Database = {
           name: string;
           event_type: EventType;
           event_date: string;
+          start_time: string | null;
+          end_time: string | null;
           venue: string | null;
           venue_address: string | null;
           theme_name: string | null;
@@ -105,6 +107,8 @@ export type Database = {
           name: string;
           event_type: EventType;
           event_date: string;
+          start_time?: string | null;
+          end_time?: string | null;
           venue?: string | null;
           venue_address?: string | null;
           theme_name?: string | null;
@@ -123,6 +127,8 @@ export type Database = {
           name?: string;
           event_type?: EventType;
           event_date?: string;
+          start_time?: string | null;
+          end_time?: string | null;
           venue?: string | null;
           venue_address?: string | null;
           theme_name?: string | null;

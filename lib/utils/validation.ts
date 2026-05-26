@@ -14,6 +14,8 @@ export const eventSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(120),
   event_type: eventTypeEnum,
   event_date: z.string().min(1, 'Date is required'),
+  start_time: z.string().optional().nullable(),
+  end_time: z.string().optional().nullable(),
   venue: z.string().optional().nullable(),
   venue_address: z.string().optional().nullable(),
   theme_name: z.string().optional().nullable(),

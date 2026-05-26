@@ -18,6 +18,7 @@ import {
   Send,
   X,
   Loader2,
+  UserCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const {
     guests,
     guestEvents,
+    attendance,
     loading,
     updateRsvp,
     deleteGuest,
@@ -89,6 +91,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const [search, setSearch] = useState('');
   const [sideFilter, setSideFilter] = useState<Side | 'all'>('all');
   const [rsvpFilter, setRsvpFilter] = useState<RsvpStatus | 'all'>('all');
+  const [checkinFilter, setCheckinFilter] = useState<'all' | 'in' | 'out'>('all');
   const [eventFilter, setEventFilter] = useState<string>('all');
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -115,15 +118,36 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
         g.email?.toLowerCase().includes(search.toLowerCase());
       const matchesSide = sideFilter === 'all' || g.side === sideFilter;
       const matchesRsvp = rsvpFilter === 'all' || g.rsvp_status === rsvpFilter;
+      const isIn = Boolean(attendance[g.id]?.attended);
+      const matchesCheckin =
+        !eventId ||
+        checkinFilter === 'all' ||
+        (checkinFilter === 'in' ? isIn : !isIn);
       const matchesEvent =
         eventId ||
         eventFilter === 'all' ||
         (eventFilter === 'none'
           ? !(guestEvents[g.id] && guestEvents[g.id].length > 0)
           : (guestEvents[g.id] ?? []).includes(eventFilter));
-      return matchesSearch && matchesSide && matchesRsvp && matchesEvent;
+      return (
+        matchesSearch &&
+        matchesSide &&
+        matchesRsvp &&
+        matchesCheckin &&
+        matchesEvent
+      );
     });
-  }, [guests, search, sideFilter, rsvpFilter, eventFilter, eventId, guestEvents]);
+  }, [
+    guests,
+    search,
+    sideFilter,
+    rsvpFilter,
+    checkinFilter,
+    eventFilter,
+    eventId,
+    guestEvents,
+    attendance,
+  ]);
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -221,7 +245,9 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   }
 
   const showEventsColumn = !eventId && events.length > 0;
-  const columnCount = (showEventsColumn ? 7 : 6) + 1;
+  const showCheckinColumn = Boolean(eventId);
+  const columnCount =
+    (showEventsColumn ? 7 : 6) + (showCheckinColumn ? 1 : 0) + 1;
 
   return (
     <div className="space-y-4">
@@ -313,6 +339,24 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             ))}
           </SelectContent>
         </Select>
+        {eventId && (
+          <Select
+            value={checkinFilter}
+            onValueChange={(v) =>
+              setCheckinFilter(v as 'all' | 'in' | 'out')
+            }
+          >
+            <SelectTrigger className="w-[160px]">
+              <UserCheck className="h-3 w-3 mr-1.5 opacity-50" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All check-ins</SelectItem>
+              <SelectItem value="in">Checked in</SelectItem>
+              <SelectItem value="out">Not checked in</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         {!eventId && events.length > 0 && (
           <Select value={eventFilter} onValueChange={setEventFilter}>
             <SelectTrigger className="w-[200px]">
@@ -393,6 +437,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
               )}
               <TableHead className="hidden lg:table-cell">Contact</TableHead>
               <TableHead>RSVP</TableHead>
+              {showCheckinColumn && <TableHead>Check-in</TableHead>}
               <TableHead className="w-[60px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -538,6 +583,19 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  {showCheckinColumn && (
+                    <TableCell>
+                      {attendance[guest.id]?.attended ? (
+                        <Badge className="bg-emerald-500 hover:bg-emerald-500">
+                          In
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          —
+                        </Badge>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center gap-1 justify-end">
                       <GuestQRCard

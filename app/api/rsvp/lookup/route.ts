@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const [{ data: event }, { data: guest }, { data: eg }] = await Promise.all([
     admin
       .from('events')
-      .select('id, name, event_date, venue')
+      .select('id, name, event_date, start_time, end_time, venue, venue_address')
       .eq('id', eventId)
       .maybeSingle(),
     admin

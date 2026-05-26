@@ -11,6 +11,34 @@ import type {
   UpdateTables,
 } from '@/lib/types/database.types';
 
+const LIVE_POLL_MS = 15_000;
+
+export type GuestAttendance = {
+  attended: boolean;
+  checked_in_at: string | null;
+};
+
+type EventGuestRow = {
+  guest_id: string;
+  rsvp_status: string | null;
+  rsvp_date: string | null;
+  attended: boolean | null;
+  checked_in_at: string | null;
+};
+
+function attendanceFromRows(
+  rows: Pick<EventGuestRow, 'guest_id' | 'attended' | 'checked_in_at'>[]
+): Record<string, GuestAttendance> {
+  const map: Record<string, GuestAttendance> = {};
+  for (const r of rows) {
+    map[r.guest_id] = {
+      attended: Boolean(r.attended),
+      checked_in_at: r.checked_in_at ?? null,
+    };
+  }
+  return map;
+}
+
 interface UseGuestsOptions {
   eventId?: string;
 }
@@ -21,20 +49,25 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
   const workspaceId = ws?.activeWorkspaceId ?? null;
   const [guests, setGuests] = useState<Guest[]>([]);
   const [guestEvents, setGuestEvents] = useState<Record<string, string[]>>({});
+  const [attendance, setAttendance] = useState<Record<string, GuestAttendance>>(
+    {}
+  );
   const [loading, setLoading] = useState(true);
 
   const fetchGuests = useCallback(async () => {
     if (eventId) {
       const { data: eventGuestRows, error: eventGuestErr } = await supabase
         .from('event_guests')
-        .select('guest_id, rsvp_status, rsvp_date')
+        .select('guest_id, rsvp_status, rsvp_date, attended, checked_in_at')
         .eq('event_id', eventId);
       if (eventGuestErr) {
         toast.error(`Failed to load guests: ${eventGuestErr.message}`);
         setLoading(false);
         return;
       }
-      const ids = (eventGuestRows ?? []).map((r) => r.guest_id);
+      const rows = (eventGuestRows ?? []) as EventGuestRow[];
+      setAttendance(attendanceFromRows(rows));
+      const ids = rows.map((r) => r.guest_id);
       if (ids.length === 0) {
         setGuests([]);
         setGuestEvents({});
@@ -49,12 +82,9 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       if (error) toast.error(`Failed to load guests: ${error.message}`);
       else {
         const rsvpByGuest = new Map(
-          (eventGuestRows ?? []).map((r) => [
+          rows.map((r) => [
             r.guest_id,
-            {
-              rsvp_status: r.rsvp_status,
-              rsvp_date: r.rsvp_date,
-            },
+            { rsvp_status: r.rsvp_status, rsvp_date: r.rsvp_date },
           ])
         );
         setGuests(
@@ -63,7 +93,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
             if (!eg?.rsvp_status) return g;
             return {
               ...g,
-              rsvp_status: eg.rsvp_status,
+              rsvp_status: eg.rsvp_status as Guest['rsvp_status'],
               rsvp_date: eg.rsvp_date,
             };
           })
@@ -73,6 +103,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       for (const id of ids) map[id] = [eventId];
       setGuestEvents(map);
     } else {
+      setAttendance({});
       if (!workspaceId) {
         setGuests([]);
         setGuestEvents({});
@@ -113,6 +144,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
   }, [supabase, eventId, workspaceId]);
 
   useEffect(() => {
+    setLoading(true);
     fetchGuests();
     const channel = supabase
       .channel(`guests-changes-${crypto.randomUUID()}`)
@@ -131,9 +163,21 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       ['guests:changed', 'event_guests:changed'],
       () => fetchGuests()
     );
+    const onFocus = () => fetchGuests();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchGuests();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') fetchGuests();
+    }, LIVE_POLL_MS);
     return () => {
       supabase.removeChannel(channel);
       offBus();
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(timer);
     };
   }, [supabase, fetchGuests]);
 
@@ -192,6 +236,13 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
 
   async function updateRsvp(id: string, rsvp_status: Guest['rsvp_status']) {
     const now = new Date().toISOString();
+    const previousGuests = guests;
+    setGuests((prev) =>
+      prev.map((g) =>
+        g.id === id ? { ...g, rsvp_status, rsvp_date: now } : g
+      )
+    );
+
     if (eventId) {
       const { error: egError } = await supabase
         .from('event_guests')
@@ -199,6 +250,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
         .eq('event_id', eventId)
         .eq('guest_id', id);
       if (egError) {
+        setGuests(previousGuests);
         toast.error(egError.message);
         return false;
       }
@@ -208,6 +260,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
       .update({ rsvp_status, rsvp_date: now })
       .eq('id', id);
     if (error) {
+      setGuests(previousGuests);
       toast.error(error.message);
       return false;
     }
@@ -266,6 +319,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
   return {
     guests,
     guestEvents,
+    attendance,
     loading,
     workspaceId,
     addGuest,

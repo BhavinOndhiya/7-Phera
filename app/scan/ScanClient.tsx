@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDateLong } from '@/lib/utils/formatting';
 import { parseGuestLinkUrl } from '@/lib/utils/guestLinks';
+import { emitDataChanged } from '@/lib/utils/dataEvents';
 
 interface LookupResponse {
   event: {
@@ -147,6 +148,7 @@ export function ScanClient() {
         return;
       }
       toast.success(`${lookup.guest.full_name} checked in`);
+      emitDataChanged('event_guests:changed');
       setLookup({ ...lookup, alreadyAttended: true });
       setMode('result');
       window.setTimeout(() => {

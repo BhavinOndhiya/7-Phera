@@ -7,6 +7,7 @@ const PROTECTED_PREFIXES = [
   '/scan',
   '/events',
   '/guests',
+  '/checkins',
   '/budget',
   '/vendors',
   '/tasks',

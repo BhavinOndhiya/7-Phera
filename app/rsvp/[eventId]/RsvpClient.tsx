@@ -16,7 +16,11 @@ import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { formatDateLong } from '@/lib/utils/formatting';
+import { AddToGoogleCalendarButton } from '@/components/events/AddToGoogleCalendarButton';
+import {
+  canAddToCalendar,
+  formatEventWhen,
+} from '@/lib/utils/eventSchedule';
 import type { RsvpStatus } from '@/lib/types/database.types';
 
 interface RsvpLookup {
@@ -24,7 +28,10 @@ interface RsvpLookup {
     id: string;
     name: string;
     event_date: string;
+    start_time: string | null;
+    end_time: string | null;
     venue: string | null;
+    venue_address: string | null;
   };
   guest: {
     id: string;
@@ -148,7 +155,11 @@ export function RsvpClient({ eventId, guestId }: RsvpClientProps) {
             }
           : prev
       );
-      toast.success('Thank you — your RSVP is saved');
+      toast.success(
+        rsvpStatus === 'declined'
+          ? 'Thank you — your RSVP is saved'
+          : 'Thank you — your RSVP is saved. Add it to your calendar below.'
+      );
     });
   }
 
@@ -204,7 +215,11 @@ export function RsvpClient({ eventId, guestId }: RsvpClientProps) {
             <div>
               <p className="font-medium">When</p>
               <p className="text-muted-foreground">
-                {formatDateLong(event.event_date)}
+                {formatEventWhen(
+                  event.event_date,
+                  event.start_time,
+                  event.end_time
+                )}
               </p>
             </div>
           </div>
@@ -243,6 +258,11 @@ export function RsvpClient({ eventId, guestId }: RsvpClientProps) {
                     timeStyle: 'short',
                   })}
                 </p>
+              )}
+              {canAddToCalendar(guest.rsvp_status) && (
+                <div className="pt-3">
+                  <AddToGoogleCalendarButton event={event} fullWidth />
+                </div>
               )}
               <p className="text-xs text-muted-foreground pt-2">
                 Changed your mind? Pick a new option below.

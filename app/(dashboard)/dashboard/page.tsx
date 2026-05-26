@@ -75,7 +75,13 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {nextEvent && <LiveCountdown targetDate={nextEvent.event_date} eventName={nextEvent.name} />}
+      {nextEvent && (
+        <LiveCountdown
+          targetDate={nextEvent.event_date}
+          startTime={nextEvent.start_time}
+          eventName={nextEvent.name}
+        />
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard

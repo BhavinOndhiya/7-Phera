@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Guest, Event } from '@/lib/types/database.types';
-import { formatDateLong } from '@/lib/utils/formatting';
+import { formatEventWhen } from '@/lib/utils/eventSchedule';
 import { emitDataChanged } from '@/lib/utils/dataEvents';
 import { buildGuestRsvpUrl } from '@/lib/utils/guestLinks';
 
@@ -125,7 +125,7 @@ export function InvitationActions({
     return (
       `Dear ${guest.full_name},\n\n` +
       `You're invited to ${effectiveEvent.name}!\n\n` +
-      `Date: ${formatDateLong(effectiveEvent.event_date)}\n` +
+      `When: ${formatEventWhen(effectiveEvent.event_date, effectiveEvent.start_time, effectiveEvent.end_time)}\n` +
       (effectiveEvent.venue ? `Venue: ${effectiveEvent.venue}\n` : '') +
       `\nPlease RSVP here:\n${rsvpUrl}\n\n` +
       `Looking forward to celebrating with you!`
