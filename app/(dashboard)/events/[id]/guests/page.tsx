@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, FileDown } from 'lucide-react';
+import { ArrowLeft, FileDown, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GuestTable } from '@/components/guests/GuestTable';
 import { RSVPTracker } from '@/components/guests/RSVPTracker';
@@ -38,6 +38,16 @@ export default function EventGuestsPage({
         </div>
         <div className="flex flex-wrap gap-2">
           {event && <InvitationActions event={event} guests={guests} />}
+          <Button
+            asChild
+            variant="outline"
+            className="border-rose-200 text-rose-700 hover:bg-rose-50"
+          >
+            <Link href="/scan">
+              <ScanLine className="h-4 w-4 mr-2" />
+              Scan at door
+            </Link>
+          </Button>
           <Button asChild variant="outline">
             <a
               href={`/api/export/guests?eventId=${resolvedParams.id}`}

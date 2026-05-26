@@ -3,7 +3,7 @@ import { brand } from './theme';
 
 /**
  * Generates a PNG QR code for an email attachment. The QR encodes the
- * guest's full RSVP/check-in URL, so the venue scanner app decodes a
+ * guest's venue entry-pass URL (`/checkin/...?guest=`), so the scanner
  * single URL and routes straight to that guest's record.
  *
  * Returned as a base64 string (no data: prefix) ready to be passed to
@@ -36,7 +36,7 @@ export function brandQrBlock(contentId: string): string {
         <td style="background:${brand.surface};border:1px solid ${brand.roseLight};border-radius:18px;padding:18px 18px 14px;text-align:center;">
           <p style="margin:0 0 10px;font-family:${brand.fontButton};font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${brand.primaryHover};font-weight:700;">Your entry pass</p>
           <img src="cid:${contentId}" alt="RSVP QR code" width="220" height="220" style="display:block;margin:0 auto;border-radius:8px;width:220px;height:220px;" />
-          <p style="margin:12px 0 0;font-family:${brand.fontButton};font-size:12px;color:${brand.textMuted};line-height:1.5;">Show this at the door — we'll scan you in.</p>
+          <p style="margin:12px 0 0;font-family:${brand.fontButton};font-size:12px;color:${brand.textMuted};line-height:1.5;">Show this at the door on the day — our team will scan you in.<br/>Use the <strong>RSVP now</strong> button above to reply before the event.</p>
         </td>
       </tr>
     </table>

@@ -16,6 +16,7 @@ import {
   Gift,
   Settings,
   Heart,
+  ScanLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
   { href: '/events', key: 'events', icon: Calendar },
   { href: '/guests', key: 'guests', icon: Users },
+  { href: '/scan', key: 'scanner', icon: ScanLine },
   { href: '/budget', key: 'budget', icon: Wallet },
   { href: '/vendors', key: 'vendors', icon: Store },
   { href: '/tasks', key: 'tasks', icon: ListChecks },

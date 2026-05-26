@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { resolveAppOrigin } from '@/lib/utils/appUrl';
+import { buildGuestPassUrl } from '@/lib/utils/guestLinks';
 
 export const runtime = 'nodejs';
 
@@ -12,7 +13,14 @@ export async function GET(
   const eventId = searchParams.get('eventId');
   const origin = resolveAppOrigin(request);
 
-  const checkInUrl = `${origin}/checkin/${eventId ?? ''}?guest=${params.guestId}`;
+  if (!eventId) {
+    return NextResponse.json(
+      { error: 'eventId query parameter is required' },
+      { status: 400 }
+    );
+  }
+
+  const checkInUrl = buildGuestPassUrl(origin, eventId, params.guestId);
 
   try {
     const png = await QRCode.toBuffer(checkInUrl, {

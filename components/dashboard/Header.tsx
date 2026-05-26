@@ -1,7 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, Bell, ChevronDown, User as UserIcon, Settings } from 'lucide-react';
+import {
+  Menu,
+  Bell,
+  ChevronDown,
+  User as UserIcon,
+  Settings,
+  ScanLine,
+} from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +66,17 @@ export function Header({ profile, email }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="lg:hidden border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 shrink-0"
+          asChild
+        >
+          <Link href="/scan">
+            <ScanLine className="h-4 w-4 mr-1.5" />
+            Scan QR
+          </Link>
+        </Button>
         <LanguageSwitcher />
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />

@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { createClient } from '@/lib/supabase/server';
 import { brand, generateRsvpQrBase64, guestInvitation } from '@/lib/emails';
 import { resolveAppOrigin } from '@/lib/utils/appUrl';
+import { buildGuestPassUrl, buildGuestRsvpUrl } from '@/lib/utils/guestLinks';
 
 const QR_CID = 'rsvp-qr';
 
@@ -60,17 +61,33 @@ export async function POST(request: Request) {
   const sent: string[] = [];
   const failed: { guestId: string; reason: string }[] = [];
 
+  const guestIdsToLink = (guests ?? []).map((g) => g.id);
+  if (guestIdsToLink.length > 0) {
+    const { error: linkErr } = await supabase.from('event_guests').upsert(
+      guestIdsToLink.map((guest_id) => ({ event_id: eventId, guest_id })),
+      { onConflict: 'event_id,guest_id', ignoreDuplicates: true }
+    );
+    if (linkErr) {
+      console.error('[invitations/send] event_guests link failed', linkErr);
+      return NextResponse.json(
+        { error: 'Could not attach guests to this event' },
+        { status: 500 }
+      );
+    }
+  }
+
   for (const guest of guests ?? []) {
     if (!guest.email) {
       failed.push({ guestId: guest.id, reason: 'No email' });
       continue;
     }
     try {
-      const rsvpUrl = `${origin}/checkin/${eventId}?guest=${guest.id}`;
+      const rsvpUrl = buildGuestRsvpUrl(origin, eventId, guest.id);
+      const passUrl = buildGuestPassUrl(origin, eventId, guest.id);
       let qrCid: string | undefined;
       let attachments: unknown[] | undefined;
       try {
-        const qrBase64 = await generateRsvpQrBase64(rsvpUrl);
+        const qrBase64 = await generateRsvpQrBase64(passUrl);
         qrCid = QR_CID;
         attachments = [
           {

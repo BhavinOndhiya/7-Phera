@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDateLong } from '@/lib/utils/formatting';
+import { parseGuestLinkUrl } from '@/lib/utils/guestLinks';
 
 interface LookupResponse {
   event: {
@@ -38,26 +39,6 @@ interface LookupResponse {
 
 type Mode = 'idle' | 'scanning' | 'looking_up' | 'result' | 'checking_in' | 'error';
 
-interface ParsedQr {
-  eventId: string;
-  guestId: string;
-}
-
-function parseQr(raw: string): ParsedQr | null {
-  try {
-    const url = raw.includes('://')
-      ? new URL(raw)
-      : new URL(raw, 'https://example.com');
-    const match = url.pathname.match(/\/checkin\/([^/]+)/);
-    const eventId = match?.[1];
-    const guestId = url.searchParams.get('guest');
-    if (!eventId || !guestId) return null;
-    return { eventId, guestId };
-  } catch {
-    return null;
-  }
-}
-
 export function ScanClient() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerRef = useRef<unknown>(null);
@@ -79,7 +60,7 @@ export function ScanClient() {
 
   const handleDecoded = useCallback(
     async (raw: string) => {
-      const parsed = parseQr(raw);
+      const parsed = parseGuestLinkUrl(raw);
       if (!parsed) {
         toast.error("That QR doesn't look like a Saath Phere invitation");
         return;
@@ -317,6 +298,18 @@ export function ScanClient() {
                 {event.venue ? ` · ${event.venue}` : ''}
               </p>
             </div>
+
+            {guest.rsvp_status === 'declined' && !alreadyAttended && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+                <p className="text-sm font-medium text-amber-900">
+                  RSVP: Declined
+                </p>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  They said they cannot attend — check in only if they came
+                  anyway.
+                </p>
+              </div>
+            )}
 
             {alreadyAttended ? (
               <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-4 text-center">

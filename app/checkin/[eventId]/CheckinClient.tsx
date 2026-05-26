@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition, useMemo, useRef } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import {
   CheckCircle2,
   Search,
@@ -26,7 +26,6 @@ interface CheckinClientProps {
   event: Event | null;
   guests: Guest[];
   attendance: AttendanceRow[];
-  initialGuestId?: string;
 }
 
 export function CheckinClient({
@@ -34,18 +33,12 @@ export function CheckinClient({
   event,
   guests,
   attendance,
-  initialGuestId,
 }: CheckinClientProps) {
   const [attendedIds, setAttendedIds] = useState<Set<string>>(
     () => new Set(attendance.filter((r) => r.attended).map((r) => r.guest_id))
   );
-  const invitedIds = useMemo(
-    () => new Set(attendance.map((r) => r.guest_id)),
-    [attendance]
-  );
   const [search, setSearch] = useState('');
   const [isPending, startTransition] = useTransition();
-  const autoCheckedInRef = useRef(false);
 
   async function setAttendance(guestId: string, attended: boolean): Promise<boolean> {
     const res = await fetch('/api/checkin', {
@@ -61,12 +54,12 @@ export function CheckinClient({
     return true;
   }
 
-  function checkIn(guestId: string, showToast = true) {
+  function checkIn(guestId: string) {
     startTransition(async () => {
       const ok = await setAttendance(guestId, true);
       if (!ok) return;
       setAttendedIds((prev) => new Set(prev).add(guestId));
-      if (showToast) toast.success('Checked in');
+      toast.success('Checked in');
     });
   }
 
@@ -82,20 +75,6 @@ export function CheckinClient({
       toast.success('Check-in undone');
     });
   }
-
-  useEffect(() => {
-    if (autoCheckedInRef.current) return;
-    if (!initialGuestId || !event) return;
-    if (!invitedIds.has(initialGuestId)) return;
-    if (attendedIds.has(initialGuestId)) return;
-    autoCheckedInRef.current = true;
-    checkIn(initialGuestId, false);
-    const guest = guests.find((g) => g.id === initialGuestId);
-    toast.success(
-      guest ? `Welcome, ${guest.full_name.split(' ')[0]}!` : 'Welcome!'
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, initialGuestId, invitedIds, attendedIds, guests]);
 
   const filtered = useMemo(() => {
     if (!search) return guests;

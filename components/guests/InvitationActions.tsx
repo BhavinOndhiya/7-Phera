@@ -191,9 +191,8 @@ export function InvitationActions({
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Each guest gets a personalised RSVP link for this event. If
-                  someone isn&apos;t yet attached to the event, they will be added
-                  automatically when they RSVP.
+                  Each guest gets a personalised RSVP link and entry-pass QR for
+                  this event. Guests are attached to the event when you send.
                 </p>
               </div>
             )}

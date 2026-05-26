@@ -3,6 +3,7 @@ import { Heart } from 'lucide-react';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import type { Event, Guest } from '@/lib/types/database.types';
 import { CheckinClient } from './CheckinClient';
+import { EntryPassClient } from './EntryPassClient';
 
 export const metadata = { title: 'Guest check-in' };
 
@@ -65,6 +66,29 @@ export default async function CheckinPage({
   params: { eventId: string };
   searchParams: { guest?: string };
 }) {
+  const guestId = searchParams.guest?.trim();
+
+  if (guestId) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-gold-50">
+        <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
+          <div className="container flex h-16 items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <Heart className="h-6 w-6 fill-rose-500 text-rose-500" />
+              <span className="font-serif text-xl font-semibold">Saath Phere</span>
+            </Link>
+            <p className="text-sm text-muted-foreground hidden sm:block">
+              Entry pass
+            </p>
+          </div>
+        </header>
+        <div className="container py-10">
+          <EntryPassClient eventId={params.eventId} guestId={guestId} />
+        </div>
+      </main>
+    );
+  }
+
   const { event, guests, attendance } = await loadCheckinData(params.eventId);
 
   return (
@@ -76,7 +100,7 @@ export default async function CheckinPage({
             <span className="font-serif text-xl font-semibold">Saath Phere</span>
           </Link>
           <p className="text-sm text-muted-foreground hidden sm:block">
-            Guest check-in
+            Staff check-in
           </p>
         </div>
       </header>
@@ -86,7 +110,6 @@ export default async function CheckinPage({
           event={event}
           guests={guests}
           attendance={attendance}
-          initialGuestId={searchParams.guest}
         />
       </div>
     </main>
