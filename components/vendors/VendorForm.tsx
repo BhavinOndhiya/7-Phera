@@ -44,7 +44,23 @@ export function VendorForm({ initial, onDone }: VendorFormProps) {
     price_range: initial?.price_range ?? '',
     notes: initial?.notes ?? '',
     contract_signed: initial?.contract_signed ?? false,
+    contract_url: initial?.contract_url ?? '',
   });
+  const [contractFile, setContractFile] = useState<File | null>(null);
+
+  async function uploadContract(vendorId: string): Promise<string | null> {
+    if (!contractFile || !workspaceId) return form.contract_url || null;
+    const path = `${workspaceId}/${vendorId}/${Date.now()}-${contractFile.name}`;
+    const { error } = await supabase.storage
+      .from('contracts')
+      .upload(path, contractFile, { upsert: true });
+    if (error) {
+      toast.error(error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from('contracts').getPublicUrl(path);
+    return data.publicUrl;
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,9 +86,15 @@ export function VendorForm({ initial, onDone }: VendorFormProps) {
       };
 
       if (initial) {
+        const contractUrl = contractFile
+          ? await uploadContract(initial.id)
+          : form.contract_url || null;
         const { data, error } = await supabase
           .from('vendors')
-          .update(payload)
+          .update({
+            ...payload,
+            contract_url: contractUrl,
+          })
           .eq('id', initial.id)
           .select()
           .single();
@@ -95,6 +117,15 @@ export function VendorForm({ initial, onDone }: VendorFormProps) {
         if (error) {
           toast.error(error.message);
           return;
+        }
+        if (contractFile && data) {
+          const contractUrl = await uploadContract(data.id);
+          if (contractUrl) {
+            await supabase
+              .from('vendors')
+              .update({ contract_url: contractUrl })
+              .eq('id', data.id);
+          }
         }
         toast.success(`${data!.name} added`);
         onDone?.(data);
@@ -239,6 +270,28 @@ export function VendorForm({ initial, onDone }: VendorFormProps) {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             rows={2}
           />
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="contract_file">Contract file (PDF or image)</Label>
+          <Input
+            id="contract_file"
+            type="file"
+            accept=".pdf,image/*"
+            onChange={(e) =>
+              setContractFile(e.target.files?.[0] ?? null)
+            }
+          />
+          {form.contract_url && !contractFile && (
+            <a
+              href={form.contract_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-rose-600 hover:underline"
+            >
+              View current contract
+            </a>
+          )}
         </div>
 
         <div className="flex items-center gap-2 sm:col-span-2">

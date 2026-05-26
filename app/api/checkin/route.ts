@@ -1,22 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { canStaffManageEvent, requireStaffSession } from '@/lib/auth/staffAccess';
 
 export const runtime = 'nodejs';
 
-/**
- * Public check-in endpoint used by the guest-facing `/checkin/{eventId}`
- * page. The page is reached by anonymous guests clicking RSVP links from
- * their invitation emails, so this route intentionally does NOT require
- * an authenticated session.
- *
- * Security:
- * - We only ever toggle `attended` / `checked_in_at` on an EXISTING
- *   `event_guests` row matching the provided `(event_id, guest_id)` pair.
- *   No inserts. No edits to other columns. No cross-event leakage.
- * - The `event_guests` row must already exist, which means the planner
- *   explicitly attached this guest to this event. Random UUID guesses
- *   update 0 rows and return 404.
- */
+/** Staff-only check-in toggle for venue scanner and staff check-in UI. */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const eventId = typeof body?.eventId === 'string' ? body.eventId : '';
@@ -29,6 +17,16 @@ export async function POST(request: Request) {
       { error: 'eventId, guestId and attended are required' },
       { status: 400 }
     );
+  }
+
+  const session = await requireStaffSession();
+  if ('error' in session) {
+    return NextResponse.json({ error: session.error }, { status: session.status });
+  }
+
+  const allowed = await canStaffManageEvent(session.userId, eventId);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Not allowed for this event' }, { status: 403 });
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {

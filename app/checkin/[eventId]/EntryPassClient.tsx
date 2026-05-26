@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, QrCode, Users } from 'lucide-react';
+import Image from 'next/image';
+import { Download, Loader2, QrCode, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDateLong } from '@/lib/utils/formatting';
@@ -75,6 +76,8 @@ export function EntryPassClient({ eventId, guestId }: EntryPassClientProps) {
   }
 
   const { event, guest } = data;
+  const qrSrc = `/api/qr/${guestId}?eventId=${encodeURIComponent(eventId)}`;
+  const downloadName = `pass-${guest.full_name.replace(/\s+/g, '-')}.png`;
 
   return (
     <div className="max-w-md mx-auto space-y-4">
@@ -107,9 +110,27 @@ export function EntryPassClient({ eventId, guestId }: EntryPassClientProps) {
               Party of {guest.party_size}
             </p>
           )}
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Show this screen or the QR in your email at the entrance. Our team
-            will scan you in.
+          <div className="rounded-xl border border-rose-100 bg-white p-4 mx-auto max-w-[260px]">
+            <p className="text-[10px] uppercase tracking-widest text-rose-600 font-semibold mb-3">
+              Scan at the door
+            </p>
+            <Image
+              src={qrSrc}
+              alt="Entry pass QR code"
+              width={220}
+              height={220}
+              className="mx-auto rounded-lg"
+              unoptimized
+            />
+          </div>
+          <Button variant="outline" size="sm" className="mt-2" asChild>
+            <a href={qrSrc} download={downloadName}>
+              <Download className="h-4 w-4 mr-2" />
+              Save QR image
+            </a>
+          </Button>
+          <p className="text-sm text-muted-foreground leading-relaxed pt-2">
+            Show this QR at the entrance. Our team will scan you in.
           </p>
           <p className="text-xs text-muted-foreground capitalize">
             RSVP: {guest.rsvp_status.replace('_', ' ')}

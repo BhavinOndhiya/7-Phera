@@ -44,6 +44,7 @@ export function CheckinClient({
     const res = await fetch('/api/checkin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ eventId, guestId, attended }),
     });
     const data = await res.json().catch(() => ({}));

@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { usePayments } from '@/lib/hooks/useBudget';
+import { RazorpayCheckout } from '@/components/budget/RazorpayCheckout';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatINR } from '@/lib/utils/formatting';
 import type { BudgetItem, PaymentMethod } from '@/lib/types/database.types';
@@ -128,6 +129,19 @@ function PaymentList({ item }: { item: BudgetItem }) {
           </p>
         </div>
       </div>
+
+      {remaining > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <RazorpayCheckout
+            item={item}
+            amountRupee={remaining}
+            onPaid={() => window.location.reload()}
+          />
+          <p className="text-xs text-muted-foreground">
+            Requires Razorpay keys in environment.
+          </p>
+        </div>
+      )}
 
       <form
         onSubmit={addPayment}

@@ -27,7 +27,15 @@ export default function GiftsPage({
           Gift registry {event ? `· ${event.name}` : ''}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Curate a wishlist guests can browse and claim from.
+          Curate a wishlist guests can browse. Share the public link:{' '}
+          <a
+            href={`/registry/${resolved.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-rose-600 hover:underline"
+          >
+            /registry/{resolved.id.slice(0, 8)}…
+          </a>
         </p>
       </div>
 

@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       .maybeSingle(),
     admin
       .from('event_guests')
-      .select('attended, checked_in_at')
+      .select('attended, checked_in_at, rsvp_status, rsvp_date')
       .eq('event_id', eventId)
       .eq('guest_id', guestId)
       .maybeSingle(),
@@ -69,7 +69,10 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     event,
-    guest,
+    guest: {
+      ...guest,
+      rsvp_status: eg.rsvp_status ?? guest.rsvp_status,
+    },
     alreadyAttended: Boolean(eg.attended),
     checkedInAt: eg.checked_in_at,
   });

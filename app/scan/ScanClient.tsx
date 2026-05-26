@@ -133,6 +133,7 @@ export function ScanClient() {
       const res = await fetch('/api/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           eventId: lookup.event.id,
           guestId: lookup.guest.id,

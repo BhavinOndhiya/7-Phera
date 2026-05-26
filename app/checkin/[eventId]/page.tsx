@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Heart } from 'lucide-react';
+import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { canStaffManageEvent } from '@/lib/auth/staffAccess';
+import { resolveGuestFromSearchParams } from '@/lib/utils/guestLinks';
 import type { Event, Guest } from '@/lib/types/database.types';
 import { CheckinClient } from './CheckinClient';
 import { EntryPassClient } from './EntryPassClient';
@@ -38,10 +42,14 @@ async function loadCheckinData(eventId: string): Promise<{
 
   const { data: eg } = await admin
     .from('event_guests')
-    .select('guest_id, attended, checked_in_at')
+    .select('guest_id, attended, checked_in_at, rsvp_status, rsvp_date')
     .eq('event_id', eventId);
 
-  const guestIds = (eg ?? []).map((r) => r.guest_id);
+  const egRows = eg ?? [];
+  const guestIds = egRows.map((r) => r.guest_id);
+  const rsvpByGuest = new Map(
+    egRows.map((r) => [r.guest_id, { rsvp_status: r.rsvp_status, rsvp_date: r.rsvp_date }])
+  );
   let guests: Guest[] = [];
   if (guestIds.length > 0) {
     const { data: g } = await admin
@@ -49,7 +57,15 @@ async function loadCheckinData(eventId: string): Promise<{
       .select('*')
       .in('id', guestIds)
       .order('full_name');
-    guests = g ?? [];
+    guests = (g ?? []).map((guest) => {
+      const row = rsvpByGuest.get(guest.id);
+      if (!row?.rsvp_status) return guest;
+      return {
+        ...guest,
+        rsvp_status: row.rsvp_status,
+        rsvp_date: row.rsvp_date,
+      };
+    });
   }
 
   return {
@@ -64,9 +80,13 @@ export default async function CheckinPage({
   searchParams,
 }: {
   params: { eventId: string };
-  searchParams: { guest?: string };
+  searchParams: { guest?: string; token?: string };
 }) {
-  const guestId = searchParams.guest?.trim();
+  const guestParams = new URLSearchParams();
+  if (searchParams.guest) guestParams.set('guest', searchParams.guest);
+  if (searchParams.token) guestParams.set('token', searchParams.token);
+  const resolved = resolveGuestFromSearchParams(params.eventId, guestParams);
+  const guestId = resolved?.guestId;
 
   if (guestId) {
     return (
@@ -87,6 +107,20 @@ export default async function CheckinPage({
         </div>
       </main>
     );
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect(`/login?redirectedFrom=/checkin/${params.eventId}`);
+  }
+
+  const allowed = await canStaffManageEvent(user.id, params.eventId);
+  if (!allowed) {
+    redirect('/dashboard');
   }
 
   const { event, guests, attendance } = await loadCheckinData(params.eventId);

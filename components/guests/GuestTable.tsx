@@ -540,13 +540,12 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 justify-end">
-                      {eventId && (
-                        <GuestQRCard
-                          guest={guest}
-                          eventId={eventId}
-                          eventName={eventName}
-                        />
-                      )}
+                      <GuestQRCard
+                        guest={guest}
+                        eventId={eventId}
+                        eventName={eventName}
+                        workspaceEvents={!eventId ? events : undefined}
+                      />
                       {(canEdit || canDelete || (canInvite && eventId)) && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

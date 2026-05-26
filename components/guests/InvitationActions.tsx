@@ -20,6 +20,7 @@ import {
 import type { Guest, Event } from '@/lib/types/database.types';
 import { formatDateLong } from '@/lib/utils/formatting';
 import { emitDataChanged } from '@/lib/utils/dataEvents';
+import { buildGuestRsvpUrl } from '@/lib/utils/guestLinks';
 
 interface InvitationActionsProps {
   event?: Event;
@@ -116,25 +117,54 @@ export function InvitationActions({
     });
   }
 
+  function buildWhatsappMessage(guest: Guest) {
+    if (!effectiveEvent) return '';
+    const origin =
+      typeof window !== 'undefined' ? window.location.origin : '';
+    const rsvpUrl = buildGuestRsvpUrl(origin, effectiveEvent.id, guest.id);
+    return (
+      `Dear ${guest.full_name},\n\n` +
+      `You're invited to ${effectiveEvent.name}!\n\n` +
+      `Date: ${formatDateLong(effectiveEvent.event_date)}\n` +
+      (effectiveEvent.venue ? `Venue: ${effectiveEvent.venue}\n` : '') +
+      `\nPlease RSVP here:\n${rsvpUrl}\n\n` +
+      `Looking forward to celebrating with you!`
+    );
+  }
+
   function whatsappShare() {
     if (!effectiveEvent) {
       toast.error('Pick an event first');
       return;
     }
-    const message = `You're invited to ${effectiveEvent.name}!\n\nDate: ${formatDateLong(
-      effectiveEvent.event_date
-    )}\n${effectiveEvent.venue ? `Venue: ${effectiveEvent.venue}\n` : ''}\nLooking forward to celebrating with you!`;
-    const encoded = encodeURIComponent(message);
 
     if (guestsWithPhone.length === 1) {
-      const phone = guestsWithPhone[0].phone!.replace(/[^0-9]/g, '');
+      const guest = guestsWithPhone[0];
+      const encoded = encodeURIComponent(buildWhatsappMessage(guest));
+      const phone = guest.phone!.replace(/[^0-9]/g, '');
       window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${encoded}`, '_blank');
-      toast.info(
-        'WhatsApp opened with invitation text. Pick contacts from the chat.'
-      );
+      return;
     }
+
+    if (guestsWithPhone.length > 1 && guests.length === 1 && guests[0].phone) {
+      const encoded = encodeURIComponent(buildWhatsappMessage(guests[0]));
+      const phone = guests[0].phone.replace(/[^0-9]/g, '');
+      window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
+      return;
+    }
+
+    const target = guestsWithPhone[0] ?? guests[0];
+    if (!target) {
+      toast.error('No guests selected');
+      return;
+    }
+    const encoded = encodeURIComponent(buildWhatsappMessage(target));
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+    toast.info(
+      guestsWithPhone.length > 1
+        ? 'WhatsApp opened with a sample message (first guest with phone). Send individually for personalised RSVP links.'
+        : 'WhatsApp opened with your invitation and RSVP link.'
+    );
   }
 
   return (

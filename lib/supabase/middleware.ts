@@ -4,6 +4,7 @@ import type { Database } from '@/lib/types/database.types';
 
 const PROTECTED_PREFIXES = [
   '/dashboard',
+  '/scan',
   '/events',
   '/guests',
   '/budget',

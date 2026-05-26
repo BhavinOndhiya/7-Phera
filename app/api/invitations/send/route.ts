@@ -102,6 +102,14 @@ export async function POST(request: Request) {
           guestId: guest.id,
           error: qrErr,
         });
+        failed.push({
+          guestId: guest.id,
+          reason:
+            qrErr instanceof Error
+              ? `QR generation failed: ${qrErr.message}`
+              : 'QR generation failed',
+        });
+        continue;
       }
 
       const { data, error } = await resend.emails.send({

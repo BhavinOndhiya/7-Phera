@@ -27,7 +27,7 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
     if (eventId) {
       const { data: eventGuestRows, error: eventGuestErr } = await supabase
         .from('event_guests')
-        .select('guest_id')
+        .select('guest_id, rsvp_status, rsvp_date')
         .eq('event_id', eventId);
       if (eventGuestErr) {
         toast.error(`Failed to load guests: ${eventGuestErr.message}`);
@@ -47,7 +47,28 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
         .in('id', ids)
         .order('full_name');
       if (error) toast.error(`Failed to load guests: ${error.message}`);
-      else setGuests(data ?? []);
+      else {
+        const rsvpByGuest = new Map(
+          (eventGuestRows ?? []).map((r) => [
+            r.guest_id,
+            {
+              rsvp_status: r.rsvp_status,
+              rsvp_date: r.rsvp_date,
+            },
+          ])
+        );
+        setGuests(
+          (data ?? []).map((g) => {
+            const eg = rsvpByGuest.get(g.id);
+            if (!eg?.rsvp_status) return g;
+            return {
+              ...g,
+              rsvp_status: eg.rsvp_status,
+              rsvp_date: eg.rsvp_date,
+            };
+          })
+        );
+      }
       const map: Record<string, string[]> = {};
       for (const id of ids) map[id] = [eventId];
       setGuestEvents(map);
@@ -170,15 +191,28 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
   }
 
   async function updateRsvp(id: string, rsvp_status: Guest['rsvp_status']) {
+    const now = new Date().toISOString();
+    if (eventId) {
+      const { error: egError } = await supabase
+        .from('event_guests')
+        .update({ rsvp_status, rsvp_date: now })
+        .eq('event_id', eventId)
+        .eq('guest_id', id);
+      if (egError) {
+        toast.error(egError.message);
+        return false;
+      }
+    }
     const { error } = await supabase
       .from('guests')
-      .update({ rsvp_status, rsvp_date: new Date().toISOString() })
+      .update({ rsvp_status, rsvp_date: now })
       .eq('id', id);
     if (error) {
       toast.error(error.message);
       return false;
     }
     emitDataChanged('guests:changed');
+    emitDataChanged('event_guests:changed');
     return true;
   }
 

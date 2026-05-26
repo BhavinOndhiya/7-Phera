@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import {
   Menu,
-  Bell,
   ChevronDown,
   User as UserIcon,
   Settings,
@@ -30,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sidebar } from './Sidebar';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { SignOutMenuItem } from './SignOutMenuItem';
+import { NotificationBell } from './NotificationBell';
 import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 import { getInitials } from '@/lib/utils/formatting';
 import type { UserProfile } from '@/lib/types/database.types';
@@ -78,10 +78,7 @@ export function Header({ profile, email }: HeaderProps) {
           </Link>
         </Button>
         <LanguageSwitcher />
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="sr-only">Notifications</span>
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

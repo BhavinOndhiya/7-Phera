@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,32 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
     due_date: initial?.due_date ?? '',
     priority: (initial?.priority ?? 'medium') as Priority,
     status: (initial?.status ?? 'todo') as TaskStatus,
+    assigned_to: initial?.assigned_to ?? '',
   });
+
+  const [members, setMembers] = useState<
+    { id: string; full_name: string | null }[]
+  >([]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    (async () => {
+      const { data: rows } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', workspaceId);
+      const ids = (rows ?? []).map((r) => r.user_id);
+      if (ids.length === 0) {
+        setMembers([]);
+        return;
+      }
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .in('id', ids);
+      setMembers(users ?? []);
+    })();
+  }, [supabase, workspaceId]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,6 +82,7 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
         due_date: form.due_date || null,
         priority: form.priority,
         status: form.status,
+        assigned_to: form.assigned_to || null,
         completed_at:
           form.status === 'completed' ? new Date().toISOString() : null,
       };
@@ -165,6 +191,31 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
               <SelectItem value="in_progress">In progress</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label>Assign to</Label>
+          <Select
+            value={form.assigned_to || 'unassigned'}
+            onValueChange={(v) =>
+              setForm({
+                ...form,
+                assigned_to: v === 'unassigned' ? '' : v,
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Unassigned" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {members.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.full_name ?? m.id}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

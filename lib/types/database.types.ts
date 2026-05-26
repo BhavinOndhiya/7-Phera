@@ -222,6 +222,8 @@ export type Database = {
           attended: boolean;
           checked_in_at: string | null;
           table_number: number | null;
+          rsvp_status: RsvpStatus;
+          rsvp_date: string | null;
         };
         Insert: {
           id?: string;
@@ -231,6 +233,8 @@ export type Database = {
           attended?: boolean;
           checked_in_at?: string | null;
           table_number?: number | null;
+          rsvp_status?: RsvpStatus;
+          rsvp_date?: string | null;
         };
         Update: {
           id?: string;
@@ -240,6 +244,8 @@ export type Database = {
           attended?: boolean;
           checked_in_at?: string | null;
           table_number?: number | null;
+          rsvp_status?: RsvpStatus;
+          rsvp_date?: string | null;
         };
         Relationships: [];
       };

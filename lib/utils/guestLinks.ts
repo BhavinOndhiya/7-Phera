@@ -2,13 +2,24 @@
  * Canonical guest-facing URLs for invitations, RSVP, and venue entry passes.
  */
 
+import { signGuestLink, verifyGuestLinkToken } from './guestLinkToken';
+
+function base(origin: string) {
+  return origin.replace(/\/+$/, '');
+}
+
+function guestQuery(eventId: string, guestId: string): string {
+  const token = signGuestLink(eventId, guestId);
+  if (token) return `token=${encodeURIComponent(token)}`;
+  return `guest=${encodeURIComponent(guestId)}`;
+}
+
 export function buildGuestRsvpUrl(
   origin: string,
   eventId: string,
   guestId: string
 ): string {
-  const base = origin.replace(/\/+$/, '');
-  return `${base}/rsvp/${eventId}?guest=${guestId}`;
+  return `${base(origin)}/rsvp/${eventId}?${guestQuery(eventId, guestId)}`;
 }
 
 /** Encoded in email QR / printed passes — scanned at the door by `/scan`. */
@@ -17,8 +28,24 @@ export function buildGuestPassUrl(
   eventId: string,
   guestId: string
 ): string {
-  const base = origin.replace(/\/+$/, '');
-  return `${base}/checkin/${eventId}?guest=${guestId}`;
+  return `${base(origin)}/checkin/${eventId}?${guestQuery(eventId, guestId)}`;
+}
+
+export function resolveGuestFromSearchParams(
+  eventIdFromPath: string,
+  searchParams: URLSearchParams
+): { eventId: string; guestId: string } | null {
+  const token = searchParams.get('token');
+  if (token) {
+    const payload = verifyGuestLinkToken(token);
+    if (!payload || payload.eventId !== eventIdFromPath) return null;
+    return { eventId: payload.eventId, guestId: payload.guestId };
+  }
+
+  const guestId = searchParams.get('guest');
+  if (guestId) return { eventId: eventIdFromPath, guestId };
+
+  return null;
 }
 
 export function parseGuestLinkUrl(raw: string): {
@@ -31,9 +58,8 @@ export function parseGuestLinkUrl(raw: string): {
       : new URL(raw, 'https://example.com');
     const match = url.pathname.match(/\/(?:rsvp|checkin)\/([^/]+)/);
     const eventId = match?.[1];
-    const guestId = url.searchParams.get('guest');
-    if (!eventId || !guestId) return null;
-    return { eventId, guestId };
+    if (!eventId) return null;
+    return resolveGuestFromSearchParams(eventId, url.searchParams);
   } catch {
     return null;
   }

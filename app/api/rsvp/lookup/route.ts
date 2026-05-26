@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       .maybeSingle(),
     admin
       .from('event_guests')
-      .select('event_id, guest_id')
+      .select('event_id, guest_id, rsvp_status, rsvp_date')
       .eq('event_id', eventId)
       .eq('guest_id', guestId)
       .maybeSingle(),
@@ -61,5 +61,11 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json({ event, guest });
+  const guestForEvent = {
+    ...guest,
+    rsvp_status: eg.rsvp_status ?? guest.rsvp_status,
+    rsvp_date: eg.rsvp_date ?? guest.rsvp_date,
+  };
+
+  return NextResponse.json({ event, guest: guestForEvent });
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
+import { resolveGuestFromSearchParams } from '@/lib/utils/guestLinks';
 import { RsvpClient } from './RsvpClient';
 
 export const metadata = { title: 'RSVP' };
@@ -11,9 +12,13 @@ export default function RsvpPage({
   searchParams,
 }: {
   params: { eventId: string };
-  searchParams: { guest?: string };
+  searchParams: { guest?: string; token?: string };
 }) {
-  const guestId = searchParams.guest?.trim() ?? '';
+  const guestParams = new URLSearchParams();
+  if (searchParams.guest) guestParams.set('guest', searchParams.guest);
+  if (searchParams.token) guestParams.set('token', searchParams.token);
+  const resolved = resolveGuestFromSearchParams(params.eventId, guestParams);
+  const guestId = resolved?.guestId ?? '';
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-gold-50">

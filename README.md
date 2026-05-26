@@ -28,9 +28,9 @@ A comprehensive, beautifully designed wedding planning platform built with **Nex
 - **Tasks** — kanban board (todo / in-progress / completed / cancelled), assignments, due-date alerts
 - **Timeline** — chronological day-of schedule grouped by date
 - **Documents** — Supabase Storage, drag-and-drop upload, category tagging, inline preview
-- **QR check-in** — per-guest QR codes for printed invitations, public `/checkin/[eventId]` page
+- **QR check-in** — email QR + entry pass, staff `/scan` scanner, per-event RSVP at `/rsvp/[eventId]`
 - **Seating planner** — `@dnd-kit` drag-and-drop tables/guests, persists to `events.seating_layout`
-- **Collaboration** — invite family / planners by email via Supabase admin invite + `event_collaborators`
+- **Collaboration** — workspace members via **Settings → Members** (`/api/workspaces/invite`)
 - **Email invitations** — Resend templates with RSVP links
 - **WhatsApp share** — `wa.me` deep links with pre-filled invitation text
 - **PDF export** — guest list and budget reports via `@react-pdf/renderer`
@@ -41,8 +41,8 @@ A comprehensive, beautifully designed wedding planning platform built with **Nex
 
 - **AI budget recommendations** — OpenAI GPT-4o-mini suggests category allocations, with deterministic fallback when no key is set
 - **Vendor reviews** — 5-star ratings with comments
-- **Real-time budget alerts** — toast notifications when category spend crosses 80% / 100%
-- **Razorpay payments** — full order + signature verify flow, auto-records `payments` row
+- **Budget warnings** — on-page toasts when category spend crosses 80% / 100% (while viewing budget)
+- **Razorpay payments** — checkout from budget item payments dialog (requires Razorpay keys)
 - **Travel & accommodation** — arrival dates, hotel info per guest, summary view
 - **Live countdown** — days / hours / mins / secs ticker
 - **Social share** — Open Graph tags + WhatsApp / Twitter / Facebook buttons
@@ -86,7 +86,7 @@ npm install
 2. From **Project Settings → API**, copy:
    - Project URL
    - `anon` public key
-   - `service_role` secret key (used for collaborator invites only)
+   - `service_role` secret key (**required** — guest RSVP/check-in, workspace bootstrap, invites)
 
 ### 3. Configure environment variables
 
@@ -114,9 +114,14 @@ In Supabase Studio → **SQL Editor**, paste the contents of each file in order:
 1. [`supabase/migrations/0001_initial_schema.sql`](supabase/migrations/0001_initial_schema.sql) — 14 tables, indexes, triggers, seed budget categories
 2. [`supabase/storage_setup.sql`](supabase/storage_setup.sql) — storage buckets (`event-documents`, `event-photos`, `avatars`, `contracts`) and their RLS policies
 3. [`supabase/migrations/0002_party_size.sql`](supabase/migrations/0002_party_size.sql) — adds `party_size` to guests so a single row can represent a whole family / group invitation
-4. [`supabase/migrations/0003_workspaces_and_rls.sql`](supabase/migrations/0003_workspaces_and_rls.sql) — **multi-tenant migration**: creates `workspaces`, `workspace_members`, `workspace_invitations`, `admin_audit_log` tables, adds `is_superadmin` / `is_suspended` columns on `users`, adds `workspace_id` columns to every scoped table, installs SQL helper functions (`is_superadmin()`, `can_view_workspace()`, `can_edit_workspace()`, `can_admin_workspace()`), replaces the blanket RLS with workspace-scoped policies, and backfills existing data from `events.created_by`
+4. [`supabase/migrations/0003_workspaces_and_rls.sql`](supabase/migrations/0003_workspaces_and_rls.sql) — **multi-tenant migration**: workspaces, RLS, backfill
+5. [`supabase/migrations/0004_event_guests_rsvp.sql`](supabase/migrations/0004_event_guests_rsvp.sql) — per-event `rsvp_status` on `event_guests`
 
 Click **Run** for each file.
+
+Auth email templates (signup, password reset): see [`supabase/templates/README.md`](supabase/templates/README.md).
+
+Generate PWA icons: `node scripts/generate-pwa-icons.mjs` (requires `sharp` — `npm install sharp --save-dev` once).
 
 ### 5. Enable Realtime (optional but recommended)
 
@@ -129,6 +134,20 @@ npm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000), sign up, and start planning!
+
+### Production checklist
+
+Before a real wedding:
+
+1. Run all migrations including `0004_event_guests_rsvp.sql`.
+2. Set `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM`, and `NEXT_PUBLIC_APP_URL` on Vercel.
+3. Set `GUEST_LINK_SECRET` (long random string) for signed RSVP/pass URLs.
+4. Run storage setup SQL so documents, gallery, avatars, and contracts upload work.
+5. Enable Supabase Realtime on `guests`, `event_guests`, `events`, `budget_items`, `tasks` (optional; app also refreshes via in-app events).
+6. Deploy, then open **`/api/health`** — all required checks should be `true`.
+7. **Mobile APK** (Capacitor shell on Desktop): open app → ☰ menu → **QR scanner**, or header **Scan QR**. Requires login. See `saath-phere-mobile/README.md`.
+
+Guest flow: email **RSVP now** → `/rsvp/...` → entry pass QR → staff scans at `/scan`.
 
 ---
 

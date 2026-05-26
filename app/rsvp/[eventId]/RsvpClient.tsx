@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
+import Link from 'next/link';
 import {
   CalendarHeart,
   CheckCircle2,
   HelpCircle,
   Loader2,
   MapPin,
+  QrCode,
   UserX,
   Users,
 } from 'lucide-react';
@@ -291,10 +293,20 @@ export function RsvpClient({ eventId, guestId }: RsvpClientProps) {
         </CardContent>
       </Card>
 
+      <Button
+        variant="outline"
+        className="w-full border-rose-200 text-rose-700 hover:bg-rose-50"
+        asChild
+      >
+        <Link href={`/checkin/${eventId}?guest=${guestId}`}>
+          <QrCode className="h-4 w-4 mr-2" />
+          View your entry pass
+        </Link>
+      </Button>
+
       <p className="text-center text-xs text-muted-foreground px-4 leading-relaxed">
-        On the day of the event, show the <strong>QR code</strong> in your
-        invitation email at the entrance. Our team will scan you in — no need to
-        open this page again.
+        On the day of the event, open your entry pass and show the QR at the
+        entrance.
       </p>
     </div>
   );

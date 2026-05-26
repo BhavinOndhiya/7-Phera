@@ -161,8 +161,8 @@ export default async function EventDetailPage({
       accent: 'bg-cyan-100 text-cyan-700',
     },
     {
-      href: `/checkin/${event.id}`,
-      label: 'Check-in',
+      href: '/scan',
+      label: 'QR scanner',
       icon: QrCode,
       desc: 'Open check-in page',
       accent: 'bg-teal-100 text-teal-700',
