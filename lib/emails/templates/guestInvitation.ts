@@ -1,5 +1,6 @@
 import { brandLayout, brandMutedLink, escapeHtml } from '../components';
 import type { BrandDetailTile } from '../components';
+import { brandQrBlock } from '../qr';
 
 export interface GuestInvitationProps {
   guestName: string;
@@ -7,6 +8,8 @@ export interface GuestInvitationProps {
   eventDate: string;
   venue?: string | null;
   rsvpUrl: string;
+  /** Content-ID of the QR PNG attached to the email. Omit to render no QR. */
+  qrCid?: string;
 }
 
 export function guestInvitation({
@@ -15,6 +18,7 @@ export function guestInvitation({
   eventDate,
   venue,
   rsvpUrl,
+  qrCid,
 }: GuestInvitationProps): string {
   const tiles: BrandDetailTile[] = [{ label: 'When', value: eventDate }];
   if (venue) tiles.push({ label: 'Where', value: venue });
@@ -23,6 +27,7 @@ export function guestInvitation({
     <p style="margin:0 0 14px;">Dear ${escapeHtml(guestName)},</p>
     <p style="margin:0 0 14px;">We would be honoured by your presence on this very special day. Your blessings mean the world to us.</p>
     <p style="margin:0 0 14px;">Please let us know if you can join us — your reply helps us plan a celebration that feels just right.</p>
+    ${qrCid ? brandQrBlock(qrCid) : ''}
   `;
 
   return brandLayout({

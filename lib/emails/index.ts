@@ -16,6 +16,7 @@ export {
   guestInvitation,
   type GuestInvitationProps,
 } from './templates/guestInvitation';
+export { generateRsvpQrBase64, brandQrBlock } from './qr';
 export {
   workspaceInvitation,
   type WorkspaceInvitationProps,

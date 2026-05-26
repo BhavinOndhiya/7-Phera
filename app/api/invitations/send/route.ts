@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@/lib/supabase/server';
-import { brand, guestInvitation } from '@/lib/emails';
+import { brand, generateRsvpQrBase64, guestInvitation } from '@/lib/emails';
 import { resolveAppOrigin } from '@/lib/utils/appUrl';
+
+const QR_CID = 'rsvp-qr';
 
 export const runtime = 'nodejs';
 
@@ -64,6 +66,27 @@ export async function POST(request: Request) {
       continue;
     }
     try {
+      const rsvpUrl = `${origin}/checkin/${eventId}?guest=${guest.id}`;
+      let qrCid: string | undefined;
+      let attachments: unknown[] | undefined;
+      try {
+        const qrBase64 = await generateRsvpQrBase64(rsvpUrl);
+        qrCid = QR_CID;
+        attachments = [
+          {
+            filename: 'rsvp-qr.png',
+            content: qrBase64,
+            content_type: 'image/png',
+            content_id: QR_CID,
+          },
+        ];
+      } catch (qrErr) {
+        console.warn('[invitations/send] QR generation failed', {
+          guestId: guest.id,
+          error: qrErr,
+        });
+      }
+
       const { data, error } = await resend.emails.send({
         from: fromAddress,
         to: guest.email,
@@ -79,8 +102,14 @@ export async function POST(request: Request) {
             year: 'numeric',
           }),
           venue: event.venue,
-          rsvpUrl: `${origin}/checkin/${eventId}?guest=${guest.id}`,
+          rsvpUrl,
+          qrCid,
         }),
+        // Resend supports `content_id` on attachments for inline cid: images,
+        // but the SDK's Attachment type omits it. Cast to bypass the type gap.
+        ...(attachments
+          ? ({ attachments } as unknown as { attachments: never })
+          : {}),
       });
 
       if (error) {

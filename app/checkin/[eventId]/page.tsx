@@ -1,17 +1,72 @@
-import { Suspense } from 'react';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
+import { createServiceRoleClient } from '@/lib/supabase/server';
+import type { Event, Guest } from '@/lib/types/database.types';
 import { CheckinClient } from './CheckinClient';
 
 export const metadata = { title: 'Guest check-in' };
 
-export default function CheckinPage({
+export const dynamic = 'force-dynamic';
+
+interface AttendanceRow {
+  guest_id: string;
+  attended: boolean;
+  checked_in_at: string | null;
+}
+
+async function loadCheckinData(eventId: string): Promise<{
+  event: Event | null;
+  guests: Guest[];
+  attendance: AttendanceRow[];
+}> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { event: null, guests: [], attendance: [] };
+  }
+
+  const admin = createServiceRoleClient();
+
+  const { data: event } = await admin
+    .from('events')
+    .select('*')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (!event) {
+    return { event: null, guests: [], attendance: [] };
+  }
+
+  const { data: eg } = await admin
+    .from('event_guests')
+    .select('guest_id, attended, checked_in_at')
+    .eq('event_id', eventId);
+
+  const guestIds = (eg ?? []).map((r) => r.guest_id);
+  let guests: Guest[] = [];
+  if (guestIds.length > 0) {
+    const { data: g } = await admin
+      .from('guests')
+      .select('*')
+      .in('id', guestIds)
+      .order('full_name');
+    guests = g ?? [];
+  }
+
+  return {
+    event,
+    guests,
+    attendance: (eg ?? []) as AttendanceRow[],
+  };
+}
+
+export default async function CheckinPage({
   params,
   searchParams,
 }: {
   params: { eventId: string };
   searchParams: { guest?: string };
 }) {
+  const { event, guests, attendance } = await loadCheckinData(params.eventId);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-gold-50">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
@@ -26,12 +81,13 @@ export default function CheckinPage({
         </div>
       </header>
       <div className="container py-10">
-        <Suspense fallback={<div className="text-center">Loading…</div>}>
-          <CheckinClient
-            eventId={params.eventId}
-            initialGuestId={searchParams.guest}
-          />
-        </Suspense>
+        <CheckinClient
+          eventId={params.eventId}
+          event={event}
+          guests={guests}
+          attendance={attendance}
+          initialGuestId={searchParams.guest}
+        />
       </div>
     </main>
   );
