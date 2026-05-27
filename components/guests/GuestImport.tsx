@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import { emitDataChanged } from '@/lib/utils/dataEvents';
+import { normalizeGuestNameKey } from '@/lib/utils/guestNameKey';
+import { parseSpreadsheetFile } from '@/lib/utils/spreadsheet';
 import type { InsertTables, Side, AgeGroup } from '@/lib/types/database.types';
 
 interface CsvRow {
@@ -175,55 +177,70 @@ export function GuestImport({
   const [fileName, setFileName] = useState<string | null>(null);
   const [showRef, setShowRef] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [existingNameKeys, setExistingNameKeys] = useState<Set<string>>(
+    new Set()
+  );
 
-  function parseFile(file: File) {
-    setFileName(file.name);
-    const lower = file.name.toLowerCase();
-    const isExcel = lower.endsWith('.xlsx') || lower.endsWith('.xls');
-
-    if (isExcel) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: 'array' });
-          const sheetName = wb.SheetNames[0];
-          if (!sheetName) {
-            toast.error('Excel file has no sheets');
-            return;
-          }
-          const sheet = wb.Sheets[sheetName];
-          const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-            sheet,
-            { defval: '', raw: false }
-          );
-          const normalized = normalizeRows(rawRows).filter((r) =>
-            Object.values(r).some((v) => v !== undefined && v !== null && v !== '')
-          );
-          setRows(normalized);
-          toast.success(`Found ${normalized.length} rows`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'unknown error';
-          toast.error(`Excel parse failed: ${msg}`);
-        }
-      };
-      reader.onerror = () => toast.error('Failed to read file');
-      reader.readAsArrayBuffer(file);
+  useEffect(() => {
+    if (!workspaceId) {
+      setExistingNameKeys(new Set());
       return;
     }
-
-    Papa.parse<Record<string, unknown>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const normalized = normalizeRows(results.data).filter((r) =>
-          Object.values(r).some((v) => v !== undefined && v !== null && v !== '')
+    void supabase
+      .from('guests')
+      .select('full_name')
+      .eq('workspace_id', workspaceId)
+      .then(({ data }) => {
+        setExistingNameKeys(
+          new Set(
+            (data ?? []).map((g) => normalizeGuestNameKey(g.full_name))
+          )
         );
-        setRows(normalized);
-        toast.success(`Found ${normalized.length} rows`);
-      },
-      error: (err) => toast.error(`CSV parse failed: ${err.message}`),
-    });
+      });
+  }, [workspaceId, supabase]);
+
+  const importStats = useMemo(() => {
+    const seenInFile = new Set<string>();
+    let ready = 0;
+    let duplicateInDb = 0;
+    let duplicateInFile = 0;
+    let invalid = 0;
+
+    for (const r of rows) {
+      const name = asString(r.full_name);
+      const relation = asString(r.relation);
+      if (!name || !relation) {
+        invalid++;
+        continue;
+      }
+      const key = normalizeGuestNameKey(name);
+      if (existingNameKeys.has(key)) {
+        duplicateInDb++;
+        continue;
+      }
+      if (seenInFile.has(key)) {
+        duplicateInFile++;
+        continue;
+      }
+      seenInFile.add(key);
+      ready++;
+    }
+
+    return { ready, duplicateInDb, duplicateInFile, invalid };
+  }, [rows, existingNameKeys]);
+
+  async function parseFile(file: File) {
+    setFileName(file.name);
+    try {
+      const rawRows = await parseSpreadsheetFile(file);
+      const normalized = normalizeRows(rawRows).filter((r) =>
+        Object.values(r).some((v) => v !== undefined && v !== null && v !== '')
+      );
+      setRows(normalized);
+      toast.success(`Found ${normalized.length} rows`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Parse failed');
+    }
   }
 
   function downloadCsvSample() {
@@ -266,35 +283,55 @@ export function GuestImport({
       return;
     }
     startTransition(async () => {
-      const inserts: InsertTables<'guests'>[] = rows
-        .filter((r) => asString(r.full_name) && asString(r.relation))
-        .map((r) => {
-          const sideRaw = asString(r.side)?.toLowerCase();
-          const side: Side = sideRaw === 'groom' ? 'groom' : 'bride';
-          const ageRaw = asString(r.age_group)?.toLowerCase();
-          const age_group: AgeGroup =
-            ageRaw === 'child' || ageRaw === 'senior' ? ageRaw : 'adult';
-          const parsedPartySize = Number(r.party_size ?? 1);
-          const party_size = Math.max(
-            1,
-            Math.min(50, isFinite(parsedPartySize) ? parsedPartySize : 1)
-          );
-          return {
-            full_name: asString(r.full_name)!,
-            side,
-            relation: asString(r.relation)!,
-            phone: asString(r.phone) ?? null,
-            email: asString(r.email) ?? null,
-            address: asString(r.address) ?? null,
-            age_group,
-            plus_one: asBool(r.plus_one),
-            party_size,
-            workspace_id: workspaceId,
-          };
+      const seenInFile = new Set<string>();
+      const inserts: InsertTables<'guests'>[] = [];
+      let skippedDuplicateDb = 0;
+      let skippedDuplicateFile = 0;
+
+      for (const r of rows) {
+        const fullName = asString(r.full_name);
+        const relation = asString(r.relation);
+        if (!fullName || !relation) continue;
+
+        const key = normalizeGuestNameKey(fullName);
+        if (existingNameKeys.has(key)) {
+          skippedDuplicateDb++;
+          continue;
+        }
+        if (seenInFile.has(key)) {
+          skippedDuplicateFile++;
+          continue;
+        }
+        seenInFile.add(key);
+
+        const sideRaw = asString(r.side)?.toLowerCase();
+        const side: Side = sideRaw === 'groom' ? 'groom' : 'bride';
+        const ageRaw = asString(r.age_group)?.toLowerCase();
+        const age_group: AgeGroup =
+          ageRaw === 'child' || ageRaw === 'senior' ? ageRaw : 'adult';
+        const parsedPartySize = Number(r.party_size ?? 1);
+        const party_size = Math.max(
+          1,
+          Math.min(50, isFinite(parsedPartySize) ? parsedPartySize : 1)
+        );
+        inserts.push({
+          full_name: fullName,
+          side,
+          relation,
+          phone: asString(r.phone) ?? null,
+          email: asString(r.email) ?? null,
+          address: asString(r.address) ?? null,
+          age_group,
+          plus_one: asBool(r.plus_one),
+          party_size,
+          workspace_id: workspaceId,
         });
+      }
 
       if (inserts.length === 0) {
-        toast.error('No valid rows found. Need at least full_name and relation.');
+        toast.error(
+          'No new guests to import. Names may already exist or rows are invalid.'
+        );
         return;
       }
 
@@ -315,7 +352,14 @@ export function GuestImport({
       }
 
       emitDataChanged('guests:changed');
-      toast.success(`Imported ${data?.length ?? 0} guests`);
+      const parts = [`Imported ${data?.length ?? 0} guests`];
+      if (skippedDuplicateDb > 0) {
+        parts.push(`${skippedDuplicateDb} skipped (already in your list)`);
+      }
+      if (skippedDuplicateFile > 0) {
+        parts.push(`${skippedDuplicateFile} duplicate names in file skipped`);
+      }
+      toast.success(parts.join(' · '));
       onDone?.();
     });
   }
@@ -333,6 +377,10 @@ export function GuestImport({
       <div className="rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 text-center">
         <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
         <p className="mt-3 font-medium">Upload a CSV or Excel file</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Duplicate names (same person twice, or already in your guest list) are
+          not imported.
+        </p>
         <p className="text-xs text-muted-foreground mt-1">
           Required: <span className="font-mono">full_name</span>,{' '}
           <span className="font-mono">side</span>,{' '}
@@ -450,11 +498,38 @@ export function GuestImport({
                 const side = asString(row.side);
                 const relation = asString(row.relation);
                 const size = Number(row.party_size ?? 1) || 1;
+                const key = name ? normalizeGuestNameKey(name) : '';
+                const isDupDb = key && existingNameKeys.has(key);
+                const isDupFile =
+                  key &&
+                  rows
+                    .slice(0, i)
+                    .some(
+                      (prev) =>
+                        normalizeGuestNameKey(asString(prev.full_name) ?? '') ===
+                        key
+                    );
                 return (
                   <tr key={i} className="border-t">
                     <td className="p-2">
                       {name ?? (
                         <span className="text-rose-500 italic">missing</span>
+                      )}
+                      {isDupDb && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-1 text-[10px] bg-amber-100 text-amber-800"
+                        >
+                          exists
+                        </Badge>
+                      )}
+                      {!isDupDb && isDupFile && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-1 text-[10px] bg-amber-100 text-amber-800"
+                        >
+                          dup
+                        </Badge>
                       )}
                     </td>
                     <td className="p-2 capitalize">
@@ -485,35 +560,33 @@ export function GuestImport({
         </div>
       )}
 
-      {(() => {
-        const validCount = rows.filter(
-          (r) => asString(r.full_name) && asString(r.relation)
-        ).length;
-        return (
-          <div className="flex flex-col gap-2 pt-2 border-t sm:flex-row sm:items-center sm:justify-between">
-            {rows.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {validCount} of {rows.length} rows ready to import
-                {validCount < rows.length &&
-                  ` · ${rows.length - validCount} skipped (missing full_name or relation)`}
-              </p>
-            )}
-            <div className="flex justify-end gap-2 sm:ml-auto">
-              <Button variant="outline" onClick={onDone}>
-                Cancel
-              </Button>
-              <Button
-                onClick={doImport}
-                disabled={validCount === 0 || isPending}
-                className="bg-rose-500 hover:bg-rose-600"
-              >
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Import {validCount > 0 ? `${validCount} guests` : ''}
-              </Button>
-            </div>
+      {rows.length > 0 && (
+        <div className="flex flex-col gap-2 pt-2 border-t sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            {importStats.ready} new guests to import
+            {importStats.duplicateInDb > 0 &&
+              ` · ${importStats.duplicateInDb} already in list`}
+            {importStats.duplicateInFile > 0 &&
+              ` · ${importStats.duplicateInFile} duplicate names in file`}
+            {importStats.invalid > 0 &&
+              ` · ${importStats.invalid} invalid (missing name or relation)`}
+          </p>
+          <div className="flex justify-end gap-2 sm:ml-auto">
+            <Button variant="outline" onClick={onDone}>
+              Cancel
+            </Button>
+            <Button
+              onClick={doImport}
+              disabled={importStats.ready === 0 || isPending}
+              className="bg-rose-500 hover:bg-rose-600"
+            >
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Import{' '}
+              {importStats.ready > 0 ? `${importStats.ready} guests` : ''}
+            </Button>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }

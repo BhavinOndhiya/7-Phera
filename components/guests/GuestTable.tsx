@@ -19,6 +19,7 @@ import {
   X,
   Loader2,
   UserCheck,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,7 @@ import { RSVP_STATUSES, SIDES } from '@/lib/constants';
 import type { Guest, Side, RsvpStatus } from '@/lib/types/database.types';
 import { GuestImport } from './GuestImport';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { exportGuestsToXlsx } from '@/lib/utils/exportGuests';
 
 interface GuestTableProps {
   eventId?: string;
@@ -324,6 +326,24 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
               onClick={() => setAddExistingOpen(true)}
             >
               <UserPlus className="h-4 w-4 mr-2" /> Invite existing
+            </Button>
+          )}
+          {guests.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const stamp = new Date().toISOString().slice(0, 10);
+                const base = eventId
+                  ? `guests-${eventName?.replace(/\s+/g, '-') ?? eventId.slice(0, 8)}`
+                  : 'guests';
+                exportGuestsToXlsx(
+                  filtered,
+                  `${base}-${stamp}.xlsx`
+                );
+                toast.success(`Exported ${filtered.length} guests to Excel`);
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" /> Export Excel
             </Button>
           )}
           {canCreate && (

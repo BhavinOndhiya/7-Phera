@@ -633,6 +633,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      guest_contributions: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          event_id: string;
+          guest_id: string;
+          amount_inr: number;
+          notes: string | null;
+          received_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          event_id: string;
+          guest_id: string;
+          amount_inr: number;
+          notes?: string | null;
+          received_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          event_id?: string;
+          guest_id?: string;
+          amount_inr?: number;
+          notes?: string | null;
+          received_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       event_collaborators: {
         Row: {
           id: string;
@@ -808,6 +844,7 @@ export type DocumentRow = Tables<'documents'>;
 export type TimelineItem = Tables<'timeline_items'>;
 export type VendorReview = Tables<'vendor_reviews'>;
 export type Gift = Tables<'gifts'>;
+export type GuestContribution = Tables<'guest_contributions'>;
 export type EventCollaborator = Tables<'event_collaborators'>;
 export type Workspace = Tables<'workspaces'>;
 export type WorkspaceMember = Tables<'workspace_members'>;
