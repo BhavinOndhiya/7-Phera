@@ -66,13 +66,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: memberErr.message }, { status: 500 });
   }
 
+  const acceptedAt = new Date().toISOString();
   await admin
     .from('workspace_invitations')
     .update({
-      accepted_at: new Date().toISOString(),
+      accepted_at: acceptedAt,
       accepted_by: user.id,
     })
-    .eq('id', invite.id);
+    .eq('workspace_id', invite.workspace_id)
+    .eq('email', invite.email.toLowerCase())
+    .is('accepted_at', null);
 
   return NextResponse.json({
     ok: true,

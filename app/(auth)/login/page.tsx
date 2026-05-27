@@ -36,6 +36,15 @@ export default function LoginPage({
           </Link>
         </p>
         <p>
+          Invited to a wedding workspace?{' '}
+          <Link
+            href="/invite/accept"
+            className="text-primary hover:underline font-medium"
+          >
+            Enter invitation link
+          </Link>
+        </p>
+        <p>
           Don&apos;t have an account?{' '}
           <Link href="/signup" className="text-primary hover:underline font-medium">
             Sign up

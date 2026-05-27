@@ -83,16 +83,47 @@ export default function CollaboratorsPage() {
         ? await supabase.from('users').select('*').in('id', userIds)
         : { data: [] };
 
-      setMembers(
-        (m ?? []).map((row) => ({
-          member: row,
-          profile: profiles?.find((p) => p.id === row.user_id) ?? null,
-        }))
+      const memberRows: MemberRow[] = (m ?? []).map((row) => ({
+        member: row,
+        profile: profiles?.find((p) => p.id === row.user_id) ?? null,
+      }));
+      setMembers(memberRows);
+
+      const memberEmails = new Set(
+        memberRows
+          .map((r) => r.profile?.email?.toLowerCase())
+          .filter((e): e is string => Boolean(e))
       );
-      setInvitations(inv ?? []);
+
+      const staleIds = (inv ?? [])
+        .filter(
+          (i) =>
+            !i.accepted_at && memberEmails.has(i.email.toLowerCase())
+        )
+        .map((i) => i.id);
+
+      if (staleIds.length > 0 && canManage) {
+        const now = new Date().toISOString();
+        await Promise.all(
+          staleIds.map((id) =>
+            supabase
+              .from('workspace_invitations')
+              .update({ accepted_at: now })
+              .eq('id', id)
+          )
+        );
+      }
+
+      setInvitations(
+        (inv ?? []).filter(
+          (i) =>
+            !i.accepted_at &&
+            !memberEmails.has(i.email.toLowerCase())
+        )
+      );
       setLoading(false);
     })();
-  }, [supabase, activeWorkspaceId]);
+  }, [supabase, activeWorkspaceId, canManage]);
 
   function invite() {
     if (!activeWorkspaceId) {
@@ -118,11 +149,17 @@ export default function CollaboratorsPage() {
         toast.error(json.error ?? 'Invite failed');
         return;
       }
-      toast.success(
-        json.emailSent
-          ? `Invitation emailed to ${email}`
-          : `Invitation created. Share the link: ${json.acceptUrl}`
-      );
+      if (json.alreadyMember) {
+        toast.info(
+          json.message ?? `${email} is already in this workspace — not pending.`
+        );
+      } else {
+        toast.success(
+          json.emailSent
+            ? `Invitation emailed to ${email}`
+            : `Invitation created — copy the link and send it to them.`
+        );
+      }
       setEmail('');
       const { data: inv } = await supabase
         .from('workspace_invitations')
@@ -372,6 +409,11 @@ export default function CollaboratorsPage() {
               <Mail className="h-5 w-5 text-rose-500" /> Pending invitations
               <Badge variant="secondary">{invitations.length}</Badge>
             </CardTitle>
+            <p className="text-sm text-muted-foreground font-normal mt-2">
+              Pending means they have <strong>not opened the invite link</strong> and
+              clicked <strong>Accept invitation</strong> while signed in as that email.
+              Signing up alone does not join your workspace.
+            </p>
           </CardHeader>
           <CardContent>
             <div className="divide-y -m-6">

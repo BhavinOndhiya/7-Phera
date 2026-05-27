@@ -66,6 +66,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
   }
 
+  const { data: existingUser } = await admin
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (existingUser) {
+    const { data: existingMember } = await admin
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', existingUser.id)
+      .maybeSingle();
+
+    if (existingMember) {
+      await admin
+        .from('workspace_invitations')
+        .update({
+          accepted_at: new Date().toISOString(),
+          accepted_by: existingUser.id,
+        })
+        .eq('workspace_id', workspaceId)
+        .eq('email', email)
+        .is('accepted_at', null);
+
+      return NextResponse.json({
+        ok: true,
+        alreadyMember: true,
+        message: `${email} is already a member of this workspace.`,
+      });
+    }
+  }
+
+  const { data: priorInvite } = await admin
+    .from('workspace_invitations')
+    .select('accepted_at, accepted_by')
+    .eq('workspace_id', workspaceId)
+    .eq('email', email)
+    .maybeSingle();
+
   const token = randomBytes(24).toString('base64url');
   const { data: invitation, error: inviteErr } = await admin
     .from('workspace_invitations')
@@ -76,8 +116,8 @@ export async function POST(request: Request) {
         role,
         token,
         invited_by: user.id,
-        accepted_at: null,
-        accepted_by: null,
+        accepted_at: priorInvite?.accepted_at ?? null,
+        accepted_by: priorInvite?.accepted_by ?? null,
         expires_at: new Date(Date.now() + 14 * 86400 * 1000).toISOString(),
       },
       { onConflict: 'workspace_id,email' }
