@@ -1,41 +1,49 @@
-import { resolveAppOrigin } from '@/lib/utils/appUrl';
-
-const LOCAL_HOST =
-  /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i;
+import { buildAppUrl, sanitizeOutboundUrl } from '@/lib/utils/appUrl';
 
 /**
- * Supabase `action_link` values often use the project's Site URL (e.g. localhost)
- * even when we pass a production `redirectTo`. Rewrite redirect_to to our app origin.
+ * Supabase `action_link` often embeds the project's Site URL (localhost).
+ * Rewrite every query param and the full string to the canonical app origin.
  */
-export function rewriteAuthActionLink(actionLink: string): string {
-  const origin = resolveAppOrigin().replace(/\/+$/, '');
+export function rewriteAuthActionLink(
+  actionLink: string,
+  request?: Request
+): string {
+  let result = sanitizeOutboundUrl(actionLink, request);
 
   try {
-    const url = new URL(actionLink);
-    const redirectTo = url.searchParams.get('redirect_to');
-    if (redirectTo) {
-      url.searchParams.set('redirect_to', replaceLocalOrigin(redirectTo, origin));
+    const url = new URL(result);
+    const keys = [...url.searchParams.keys()];
+    for (const key of keys) {
+      const value = url.searchParams.get(key);
+      if (
+        value &&
+        (value.includes('localhost') ||
+          value.includes('127.0.0.1') ||
+          value.includes('0.0.0.0'))
+      ) {
+        url.searchParams.set(key, sanitizeOutboundUrl(value, request));
+      }
     }
-    return url.toString();
+    result = url.toString();
   } catch {
-    return actionLink;
+    // keep sanitized full-string result
   }
+
+  return sanitizeOutboundUrl(result, request);
 }
 
-function replaceLocalOrigin(target: string, origin: string): string {
-  try {
-    const u = new URL(target);
-    if (LOCAL_HOST.test(u.hostname)) {
-      return `${origin}${u.pathname}${u.search}${u.hash}`;
-    }
-    return target;
-  } catch {
-    return target;
-  }
-}
-
-export function authCallbackUrl(nextPath: string): string {
-  const origin = resolveAppOrigin().replace(/\/+$/, '');
+export function authCallbackUrl(nextPath: string, request?: Request): string {
   const next = nextPath.startsWith('/') ? nextPath : `/${nextPath}`;
-  return `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+  return buildAppUrl(
+    `/auth/callback?next=${encodeURIComponent(next)}`,
+    request
+  );
+}
+
+/** After sanitizing, ensure redirect_to matches our app origin (belt + suspenders). */
+export function prepareAuthEmailLink(
+  rawLink: string,
+  request?: Request
+): string {
+  return rewriteAuthActionLink(rawLink, request);
 }

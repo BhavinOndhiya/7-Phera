@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { resolveAppOrigin } from '@/lib/utils/appUrl';
+import { buildAppUrl } from '@/lib/utils/appUrl';
 
 export const runtime = 'nodejs';
 
@@ -33,11 +33,11 @@ export async function POST(request: Request) {
   }
 
   const admin = createServiceRoleClient();
-  const origin = resolveAppOrigin(request);
+  const redirectTo = buildAppUrl('/dashboard', request);
 
   const { data: invite, error: inviteError } = await admin.auth.admin
     .inviteUserByEmail(email, {
-      redirectTo: `${origin}/dashboard`,
+      redirectTo,
     });
 
   if (inviteError && !inviteError.message.includes('already')) {

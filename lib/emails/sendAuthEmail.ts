@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { sanitizeOutboundUrl } from '@/lib/utils/appUrl';
 import { brand } from './theme';
 import { accountConfirmation } from './templates/accountConfirmation';
 import { passwordRecovery } from './templates/passwordRecovery';
@@ -30,6 +31,8 @@ export async function sendAccountConfirmationEmail(opts: {
     };
   }
 
+  const confirmUrl = sanitizeOutboundUrl(opts.confirmUrl);
+
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const replyTo = resendReplyTo();
@@ -43,7 +46,7 @@ export async function sendAccountConfirmationEmail(opts: {
       html: accountConfirmation({
         fullName: opts.fullName,
         email: opts.to,
-        confirmUrl: opts.confirmUrl,
+        confirmUrl,
         isResend: opts.isResend,
       }),
     });
@@ -79,6 +82,8 @@ export async function sendPasswordRecoveryEmail(opts: {
     };
   }
 
+  const resetUrl = sanitizeOutboundUrl(opts.resetUrl);
+
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const replyTo = resendReplyTo();
@@ -89,7 +94,7 @@ export async function sendPasswordRecoveryEmail(opts: {
       subject: `Reset your ${brand.name} password`,
       html: passwordRecovery({
         email: opts.to,
-        resetUrl: opts.resetUrl,
+        resetUrl,
       }),
     });
 

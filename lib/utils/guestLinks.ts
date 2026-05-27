@@ -2,6 +2,7 @@
  * Canonical guest-facing URLs for invitations, RSVP, and venue entry passes.
  */
 
+import { sanitizeOutboundUrl } from '@/lib/utils/appUrl';
 import { signGuestLink, verifyGuestLinkToken } from './guestLinkToken';
 
 function base(origin: string) {
@@ -19,7 +20,9 @@ export function buildGuestRsvpUrl(
   eventId: string,
   guestId: string
 ): string {
-  return `${base(origin)}/rsvp/${eventId}?${guestQuery(eventId, guestId)}`;
+  return sanitizeOutboundUrl(
+    `${base(origin)}/rsvp/${eventId}?${guestQuery(eventId, guestId)}`
+  );
 }
 
 /** Encoded in email QR / printed passes — scanned at the door by `/scan`. */
@@ -28,7 +31,9 @@ export function buildGuestPassUrl(
   eventId: string,
   guestId: string
 ): string {
-  return `${base(origin)}/checkin/${eventId}?${guestQuery(eventId, guestId)}`;
+  return sanitizeOutboundUrl(
+    `${base(origin)}/checkin/${eventId}?${guestQuery(eventId, guestId)}`
+  );
 }
 
 export function resolveGuestFromSearchParams(
