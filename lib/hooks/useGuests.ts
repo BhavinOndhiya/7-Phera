@@ -234,6 +234,38 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
     return true;
   }
 
+  async function deleteManyGuests(ids: string[]) {
+    if (ids.length === 0) return true;
+    const { error } = await supabase.from('guests').delete().in('id', ids);
+    if (error) {
+      toast.error(error.message);
+      return false;
+    }
+    emitDataChanged('guests:changed');
+    toast.success(
+      `Removed ${ids.length} guest${ids.length === 1 ? '' : 's'} from workspace`
+    );
+    return true;
+  }
+
+  async function removeManyFromEvent(guestIds: string[], targetEventId: string) {
+    if (guestIds.length === 0) return true;
+    const { error } = await supabase
+      .from('event_guests')
+      .delete()
+      .eq('event_id', targetEventId)
+      .in('guest_id', guestIds);
+    if (error) {
+      toast.error(error.message);
+      return false;
+    }
+    emitDataChanged('event_guests:changed');
+    toast.success(
+      `Removed ${guestIds.length} guest${guestIds.length === 1 ? '' : 's'} from event`
+    );
+    return true;
+  }
+
   async function updateRsvp(id: string, rsvp_status: Guest['rsvp_status']) {
     const now = new Date().toISOString();
     const previousGuests = guests;
@@ -325,6 +357,8 @@ export function useGuests({ eventId }: UseGuestsOptions = {}) {
     addGuest,
     updateGuest,
     deleteGuest,
+    deleteManyGuests,
+    removeManyFromEvent,
     updateRsvp,
     inviteToEvent,
     inviteManyToEvent,

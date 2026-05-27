@@ -79,7 +79,9 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
     loading,
     updateRsvp,
     deleteGuest,
+    deleteManyGuests,
     removeFromEvent,
+    removeManyFromEvent,
   } = useGuests({ eventId });
   const { events } = useEvents();
   const { event: scopedEvent } = useEvent(eventId ?? null);
@@ -101,6 +103,9 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sendingSingleId, setSendingSingleId] = useState<string | null>(null);
   const [, startSingleSendTransition] = useTransition();
+  const [isBulkPending, startBulkTransition] = useTransition();
+
+  const canSelect = canInvite || canDelete;
 
   const eventsById = useMemo(() => {
     const m: Record<string, { id: string; name: string }> = {};
@@ -202,6 +207,36 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
 
   function clearSelection() {
     setSelectedIds(new Set());
+  }
+
+  function bulkDeleteSelected() {
+    const ids = [...selectedIds];
+    const count = ids.length;
+    const message = eventId
+      ? `Delete ${count} selected guest${count === 1 ? '' : 's'} from your workspace? They will be removed from every event. This cannot be undone.`
+      : `Delete ${count} selected guest${count === 1 ? '' : 's'} from your workspace? This cannot be undone.`;
+    if (!confirm(message)) return;
+    startBulkTransition(async () => {
+      const ok = await deleteManyGuests(ids);
+      if (ok) clearSelection();
+    });
+  }
+
+  function bulkRemoveFromEvent() {
+    if (!eventId) return;
+    const ids = [...selectedIds];
+    const count = ids.length;
+    if (
+      !confirm(
+        `Remove ${count} selected guest${count === 1 ? '' : 's'} from this event only? They will stay in your guest list.`
+      )
+    ) {
+      return;
+    }
+    startBulkTransition(async () => {
+      const ok = await removeManyFromEvent(ids, eventId);
+      if (ok) clearSelection();
+    });
   }
 
   function sendSingleInvitation(guest: Guest) {
@@ -376,35 +411,69 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
         )}
       </div>
 
-      {canInvite && selectedIds.size > 0 && (
+      {canSelect && selectedIds.size > 0 && (
         <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/95 backdrop-blur px-4 py-2.5 shadow-sm">
           <div className="flex items-center gap-2">
             <Badge className="bg-rose-500 text-white hover:bg-rose-500">
               {selectedIds.size}
             </Badge>
             <span className="text-sm font-medium">selected</span>
-            <span className="text-xs text-muted-foreground">
-              · {selectedWithEmailCount} have email
-            </span>
+            {canInvite && (
+              <span className="text-xs text-muted-foreground">
+                · {selectedWithEmailCount} have email
+              </span>
+            )}
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={clearSelection}
+              disabled={isBulkPending}
               className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5 mr-1" /> Clear
             </Button>
-            <Button
-              size="sm"
-              className="bg-rose-500 hover:bg-rose-600"
-              onClick={() => setSendDialogOpen(true)}
-              disabled={selectedWithEmailCount === 0 && !eventId}
-            >
-              <Send className="h-3.5 w-3.5 mr-1.5" />
-              Send invitations
-            </Button>
+            {canDelete && eventId && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isBulkPending}
+                onClick={bulkRemoveFromEvent}
+              >
+                <UserMinus className="h-3.5 w-3.5 mr-1.5" />
+                Remove from event
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isBulkPending}
+                onClick={bulkDeleteSelected}
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+              >
+                {isBulkPending ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Delete selected
+              </Button>
+            )}
+            {canInvite && (
+              <Button
+                size="sm"
+                className="bg-rose-500 hover:bg-rose-600"
+                onClick={() => setSendDialogOpen(true)}
+                disabled={
+                  isBulkPending || (selectedWithEmailCount === 0 && !eventId)
+                }
+              >
+                <Send className="h-3.5 w-3.5 mr-1.5" />
+                Send invitations
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -413,7 +482,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              {canInvite && (
+              {canSelect && (
                 <TableHead className="w-[44px]">
                   <Checkbox
                     aria-label="Select all filtered guests"
@@ -445,7 +514,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             {loading && (
               <TableRow>
                 <TableCell
-                  colSpan={canInvite ? columnCount : columnCount - 1}
+                  colSpan={canSelect ? columnCount : columnCount - 1}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Loading guests…
@@ -455,7 +524,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             {!loading && filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={canInvite ? columnCount : columnCount - 1}
+                  colSpan={canSelect ? columnCount : columnCount - 1}
                   className="text-center py-12 text-muted-foreground"
                 >
                   {guests.length === 0
@@ -474,7 +543,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                   key={guest.id}
                   data-state={isSelected ? 'selected' : undefined}
                 >
-                  {canInvite && (
+                  {canSelect && (
                     <TableCell>
                       <Checkbox
                         aria-label={`Select ${guest.full_name}`}
