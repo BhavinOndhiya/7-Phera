@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
 import {
   Crown,
   Loader2,
@@ -202,6 +204,13 @@ export default function CollaboratorsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <div>
+        <Link
+          href="/settings"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back to settings
+        </Link>
         <h1 className="font-serif text-3xl font-semibold">Members & roles</h1>
         <p className="text-muted-foreground mt-1">
           Manage who can access <strong>{activeWorkspace.name}</strong>.
