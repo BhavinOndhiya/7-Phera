@@ -54,22 +54,11 @@ export function sanitizeOutboundUrl(url: string, _request?: Request): string {
   }
 
   const canonical = APP_ORIGIN;
-  let result = url;
+  let result = url
+    .replace(LOCAL_ORIGIN_IN_TEXT, canonical)
+    .replace(ENCODED_LOCALHOST, encodeURIComponent(canonical));
 
-  for (let pass = 0; pass < 3; pass++) {
-    result = result.replace(LOCAL_ORIGIN_IN_TEXT, canonical);
-    result = result.replace(ENCODED_LOCALHOST, encodeURIComponent(canonical));
-    try {
-      const decoded = decodeURIComponent(result);
-      if (decoded === result) break;
-      result = decoded;
-    } catch {
-      break;
-    }
-  }
-
-  result = result.replace(LOCAL_ORIGIN_IN_TEXT, canonical);
-
+  // Only rewrite redirect_to — never decodeURIComponent the whole URL (breaks token_hash).
   try {
     const parsed = new URL(result);
     const redirectTo = parsed.searchParams.get('redirect_to');

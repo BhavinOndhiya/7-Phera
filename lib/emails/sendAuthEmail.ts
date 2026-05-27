@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { sanitizeOutboundUrl } from '@/lib/utils/appUrl';
+import { APP_ORIGIN, sanitizeOutboundUrl } from '@/lib/utils/appUrl';
 import { brand } from './theme';
 import { accountConfirmation } from './templates/accountConfirmation';
 import { passwordRecovery } from './templates/passwordRecovery';
@@ -17,6 +17,14 @@ function resendReplyTo(): string | undefined {
   return v || undefined;
 }
 
+/** Our /auth/confirm links are already canonical — do not rewrite (can break token_hash). */
+function prepareAuthUrl(url: string): string {
+  if (url.startsWith(`${APP_ORIGIN}/auth/confirm`)) {
+    return url;
+  }
+  return sanitizeOutboundUrl(url);
+}
+
 export async function sendAccountConfirmationEmail(opts: {
   to: string;
   fullName: string;
@@ -31,7 +39,7 @@ export async function sendAccountConfirmationEmail(opts: {
     };
   }
 
-  const confirmUrl = sanitizeOutboundUrl(opts.confirmUrl);
+  const confirmUrl = prepareAuthUrl(opts.confirmUrl);
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
@@ -82,7 +90,7 @@ export async function sendPasswordRecoveryEmail(opts: {
     };
   }
 
-  const resetUrl = sanitizeOutboundUrl(opts.resetUrl);
+  const resetUrl = prepareAuthUrl(opts.resetUrl);
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
@@ -103,9 +111,14 @@ export async function sendPasswordRecoveryEmail(opts: {
       return { ok: false, error: `${error.name}: ${error.message}` };
     }
 
+    console.log('[sendAuthEmail] recovery sent', {
+      to: opts.to,
+      resendId: data?.id,
+    });
     return { ok: true, id: data?.id };
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to send email';
+    console.error('[sendAuthEmail] recovery failed', e);
     return { ok: false, error: message };
   }
 }

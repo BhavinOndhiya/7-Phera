@@ -20,14 +20,21 @@ export function ForgotPasswordForm() {
         return;
       }
       setSent(true);
-      toast.success('Check your inbox!');
+      toast.success(result.message ?? 'Check your inbox!');
     });
   }
 
   if (sent) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-        We&apos;ve sent you a password reset link. Please check your email.
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 space-y-2">
+        <p>
+          If an account exists for that email, we sent a password reset link.
+          Check your inbox and spam folder.
+        </p>
+        <p className="text-emerald-700/90">
+          The link goes to <strong>7-phera.vercel.app</strong> (not localhost).
+          Use only the newest email — older links expire.
+        </p>
       </div>
     );
   }

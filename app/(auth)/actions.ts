@@ -169,7 +169,7 @@ export async function resendConfirmationAction(
     };
   }
 
-  const confirmUrl = emailLinkFromGenerateLink(linkData.properties, '/dashboard');
+  const confirmUrl = emailLinkFromGenerateLink(linkData, '/dashboard', 'magiclink');
   if (!confirmUrl) {
     return { ok: false, error: 'Could not create a confirmation link. Try again.' };
   }
@@ -242,8 +242,9 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
   }
 
   const confirmUrl = emailLinkFromGenerateLink(
-    linkData.properties,
-    nextAfterConfirm
+    linkData,
+    nextAfterConfirm,
+    'signup'
   );
   if (!confirmUrl) {
     return {
@@ -297,11 +298,25 @@ export async function logoutAction() {
 export async function forgotPasswordAction(
   formData: FormData
 ): Promise<ActionResult> {
-  const email = String(formData.get('email') ?? '');
+  const email = String(formData.get('email') ?? '')
+    .trim()
+    .toLowerCase();
   if (!email) return { ok: false, error: 'Email required' };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: 'Enter a valid email address' };
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[forgotPasswordAction] SUPABASE_SERVICE_ROLE_KEY is not set');
+    return {
+      ok: false,
+      error:
+        'Password reset is not configured on the server. Contact support or try again later.',
+    };
+  }
 
   const admin = createServiceRoleClient();
-  const redirectTo = authCallbackUrl('/reset-password');
+  const redirectTo = `${authCallbackUrl('/reset-password')}`;
 
   const { data: linkData, error: linkError } =
     await admin.auth.admin.generateLink({
@@ -311,23 +326,44 @@ export async function forgotPasswordAction(
     });
 
   if (linkError) {
+    const msg = linkError.message.toLowerCase();
+    console.error('[forgotPasswordAction] generateLink failed', {
+      email,
+      message: linkError.message,
+    });
+    if (msg.includes('not found') || msg.includes('no user')) {
+      return {
+        ok: true,
+        message:
+          'If an account exists for that email, we sent a password reset link. Check spam.',
+      };
+    }
     return { ok: false, error: linkError.message };
   }
 
-  const resetUrl = emailLinkFromGenerateLink(
-    linkData.properties,
-    '/reset-password'
-  );
+  const resetUrl = emailLinkFromGenerateLink(linkData, '/reset-password', 'recovery');
   if (!resetUrl) {
+    console.error('[forgotPasswordAction] could not build reset URL', {
+      email,
+      hasProperties: Boolean(linkData?.properties),
+    });
     return { ok: false, error: 'Could not create password reset link.' };
   }
 
   const emailResult = await sendPasswordRecoveryEmail({ to: email, resetUrl });
   if (!emailResult.ok) {
+    console.error('[forgotPasswordAction] Resend failed', {
+      email,
+      error: emailResult.error,
+    });
     return { ok: false, error: emailResult.error };
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    message:
+      'Password reset email sent. Check your inbox and spam folder — use the latest email only.',
+  };
 }
 
 export async function resetPasswordAction(
