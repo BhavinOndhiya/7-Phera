@@ -3,10 +3,11 @@
 import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, User, Phone } from 'lucide-react';
+import { Loader2, Mail, User, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/auth/PasswordInput';
 import { signupAction } from '../actions';
 
 const ROLES = [
@@ -95,19 +96,14 @@ export function SignupForm() {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="6+ characters"
-              required
-              minLength={6}
-              autoComplete="new-password"
-              className="pl-9"
-            />
-          </div>
+          <PasswordInput
+            id="password"
+            name="password"
+            placeholder="6+ characters"
+            required
+            minLength={6}
+            autoComplete="new-password"
+          />
         </div>
 
         <div className="space-y-2">

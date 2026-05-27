@@ -24,7 +24,10 @@ export default function LoginPage({
         </div>
       )}
 
-      <LoginForm redirectedFrom={searchParams.redirectedFrom} />
+      <LoginForm
+        redirectedFrom={searchParams.redirectedFrom}
+        showConfirmationBanner={Boolean(searchParams.message)}
+      />
 
       <div className="text-sm text-muted-foreground space-y-2">
         <p>

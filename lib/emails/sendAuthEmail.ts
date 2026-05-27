@@ -20,6 +20,7 @@ export async function sendAccountConfirmationEmail(opts: {
   to: string;
   fullName: string;
   confirmUrl: string;
+  isResend?: boolean;
 }): Promise<AuthEmailResult> {
   if (!process.env.RESEND_API_KEY) {
     return {
@@ -36,11 +37,14 @@ export async function sendAccountConfirmationEmail(opts: {
       from: resendFromAddress(),
       to: opts.to,
       ...(replyTo ? { reply_to: replyTo } : {}),
-      subject: `Confirm your ${brand.name} account`,
+      subject: opts.isResend
+        ? `New confirmation link · ${brand.name}`
+        : `Confirm your ${brand.name} account`,
       html: accountConfirmation({
         fullName: opts.fullName,
         email: opts.to,
         confirmUrl: opts.confirmUrl,
+        isResend: opts.isResend,
       }),
     });
 
