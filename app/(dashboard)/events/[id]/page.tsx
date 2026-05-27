@@ -25,6 +25,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { LiveCountdown } from '@/components/dashboard/LiveCountdown';
 import { ShareButtons } from '@/components/shared/ShareButtons';
 import { formatEventWhen } from '@/lib/utils/eventSchedule';
+import { APP_ORIGIN } from '@/lib/utils/appUrl';
 import {
   formatINRShort,
   daysUntil,
@@ -208,7 +209,7 @@ export default async function EventDetailPage({
               <DeleteEventButton id={event.id} />
             </div>
             <ShareButtons
-              url={`${process.env.NEXT_PUBLIC_APP_URL ?? ''}/events/${event.id}`}
+              url={`${APP_ORIGIN}/events/${event.id}`}
               title={event.name}
               text={`You're invited to ${event.name}!`}
             />

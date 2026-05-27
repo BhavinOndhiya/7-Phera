@@ -1,49 +1,17 @@
-import { buildAppUrl, sanitizeOutboundUrl } from '@/lib/utils/appUrl';
+import { APP_ORIGIN, buildAppUrl, sanitizeOutboundUrl } from '@/lib/utils/appUrl';
 
 /**
- * Supabase `action_link` often embeds the project's Site URL (localhost).
- * Rewrite every query param and the full string to the canonical app origin.
+ * Supabase embeds Site URL (often localhost) in action_link — always rewrite to APP_ORIGIN.
  */
-export function rewriteAuthActionLink(
-  actionLink: string,
-  request?: Request
-): string {
-  let result = sanitizeOutboundUrl(actionLink, request);
-
-  try {
-    const url = new URL(result);
-    const keys = [...url.searchParams.keys()];
-    for (const key of keys) {
-      const value = url.searchParams.get(key);
-      if (
-        value &&
-        (value.includes('localhost') ||
-          value.includes('127.0.0.1') ||
-          value.includes('0.0.0.0'))
-      ) {
-        url.searchParams.set(key, sanitizeOutboundUrl(value, request));
-      }
-    }
-    result = url.toString();
-  } catch {
-    // keep sanitized full-string result
-  }
-
-  return sanitizeOutboundUrl(result, request);
+export function rewriteAuthActionLink(actionLink: string): string {
+  return sanitizeOutboundUrl(actionLink);
 }
 
-export function authCallbackUrl(nextPath: string, request?: Request): string {
+export function authCallbackUrl(nextPath: string): string {
   const next = nextPath.startsWith('/') ? nextPath : `/${nextPath}`;
-  return buildAppUrl(
-    `/auth/callback?next=${encodeURIComponent(next)}`,
-    request
-  );
+  return `${APP_ORIGIN}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
-/** After sanitizing, ensure redirect_to matches our app origin (belt + suspenders). */
-export function prepareAuthEmailLink(
-  rawLink: string,
-  request?: Request
-): string {
-  return rewriteAuthActionLink(rawLink, request);
+export function prepareAuthEmailLink(rawLink: string): string {
+  return sanitizeOutboundUrl(rawLink);
 }

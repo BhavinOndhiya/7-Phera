@@ -21,6 +21,7 @@ import type { Guest, Event } from '@/lib/types/database.types';
 import { formatEventWhen } from '@/lib/utils/eventSchedule';
 import { emitDataChanged } from '@/lib/utils/dataEvents';
 import { buildGuestRsvpUrl } from '@/lib/utils/guestLinks';
+import { resolveAppOrigin } from '@/lib/utils/appUrl';
 
 interface InvitationActionsProps {
   event?: Event;
@@ -119,9 +120,11 @@ export function InvitationActions({
 
   function buildWhatsappMessage(guest: Guest) {
     if (!effectiveEvent) return '';
-    const origin =
-      typeof window !== 'undefined' ? window.location.origin : '';
-    const rsvpUrl = buildGuestRsvpUrl(origin, effectiveEvent.id, guest.id);
+    const rsvpUrl = buildGuestRsvpUrl(
+      resolveAppOrigin(),
+      effectiveEvent.id,
+      guest.id
+    );
     return (
       `Dear ${guest.full_name},\n\n` +
       `You're invited to ${effectiveEvent.name}!\n\n` +

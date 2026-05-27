@@ -34,6 +34,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { roleDescription, roleLabel } from '@/lib/utils/permissions';
+import { buildAppUrl } from '@/lib/utils/appUrl';
 import type {
   UserProfile,
   WorkspaceInvitation,
@@ -221,7 +222,7 @@ export default function CollaboratorsPage() {
   }
 
   function copyInviteLink(token: string) {
-    const url = `${window.location.origin}/invite/accept?token=${token}`;
+    const url = buildAppUrl(`/invite/accept?token=${token}`);
     navigator.clipboard.writeText(url);
     toast.success('Invite link copied to clipboard');
   }

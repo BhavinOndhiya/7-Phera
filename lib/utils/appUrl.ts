@@ -1,88 +1,101 @@
 /**
- * Canonical origin for every link in emails, QR codes, and auth redirects.
- * Production must never leak localhost — Supabase Site URL is often still local.
+ * Every email, auth link, QR code, and invite URL uses this origin.
+ * Hardcoded so Supabase Site URL (often localhost) can never leak into Resend emails.
+ *
+ * Local dev only: set USE_LOCAL_EMAIL_LINKS=true in .env.local to use localhost in emails.
  */
-export const PRODUCTION_ORIGIN = 'https://7-phera.vercel.app';
+export const APP_ORIGIN = 'https://7-phera.vercel.app';
 
-const LOCAL_HOSTNAME =
-  /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i;
-
-/** Matches http://localhost:3000 and similar anywhere in a string */
 const LOCAL_ORIGIN_IN_TEXT =
   /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?/gi;
+
+const ENCODED_LOCALHOST =
+  /https?%3A%2F%2F(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?/gi;
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
-export function isLocalHostname(hostname: string): boolean {
-  return LOCAL_HOSTNAME.test(hostname);
-}
+/** @deprecated use APP_ORIGIN */
+export const PRODUCTION_ORIGIN = APP_ORIGIN;
 
-export function isLocalOrigin(url: string): boolean {
-  try {
-    return isLocalHostname(new URL(url).hostname);
-  } catch {
-    return /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(url);
-  }
-}
-
-function isDeployedRuntime(): boolean {
-  return Boolean(
-    process.env.VERCEL ||
-      process.env.VERCEL_URL ||
-      process.env.VERCEL_ENV === 'production' ||
-      process.env.VERCEL_ENV === 'preview' ||
-      process.env.NODE_ENV === 'production'
-  );
-}
-
-function productionOriginFromEnv(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (fromEnv && /^https?:\/\//i.test(fromEnv) && !isLocalOrigin(fromEnv)) {
-    return stripTrailingSlash(fromEnv);
-  }
-  return PRODUCTION_ORIGIN;
-}
-
-export function resolveAppOrigin(request?: Request): string {
-  const production = productionOriginFromEnv();
-
-  if (isDeployedRuntime()) {
-    return production;
-  }
-
-  if (request) {
-    const origin = new URL(request.url).origin;
-    if (!isLocalOrigin(origin)) return origin;
-    if (process.env.NODE_ENV === 'development') return origin;
-  }
-
-  if (fromEnvNonLocal()) return productionOriginFromEnv();
-
-  return 'http://localhost:3000';
-}
-
-function fromEnvNonLocal(): boolean {
-  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  return Boolean(
-    fromEnv && /^https?:\/\//i.test(fromEnv) && !isLocalOrigin(fromEnv)
-  );
+function allowLocalEmailLinks(): boolean {
+  return process.env.USE_LOCAL_EMAIL_LINKS === 'true';
 }
 
 /**
- * Replace any localhost URL embedded in emails or Supabase action links.
+ * Origin for all outbound links. Defaults to https://7-phera.vercel.app always.
  */
-export function sanitizeOutboundUrl(url: string, request?: Request): string {
-  const canonical = resolveAppOrigin(request).replace(/\/+$/, '');
-  if (isLocalOrigin(canonical)) {
-    return url;
+export function resolveAppOrigin(_request?: Request): string {
+  if (allowLocalEmailLinks()) {
+    const local =
+      process.env.LOCAL_APP_ORIGIN?.trim() || 'http://localhost:3000';
+    return stripTrailingSlash(local);
   }
-  return url.replace(LOCAL_ORIGIN_IN_TEXT, canonical);
+
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (
+    fromEnv &&
+    /^https?:\/\//i.test(fromEnv) &&
+    !/localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(fromEnv)
+  ) {
+    return stripTrailingSlash(fromEnv);
+  }
+
+  return APP_ORIGIN;
 }
 
-export function buildAppUrl(path: string, request?: Request): string {
-  const origin = resolveAppOrigin(request).replace(/\/+$/, '');
+/**
+ * Force production origin into any string (Supabase action_link, email HTML, etc.).
+ */
+export function sanitizeOutboundUrl(url: string, _request?: Request): string {
+  if (allowLocalEmailLinks()) {
+    return url;
+  }
+
+  const canonical = APP_ORIGIN;
+  let result = url;
+
+  for (let pass = 0; pass < 3; pass++) {
+    result = result.replace(LOCAL_ORIGIN_IN_TEXT, canonical);
+    result = result.replace(ENCODED_LOCALHOST, encodeURIComponent(canonical));
+    try {
+      const decoded = decodeURIComponent(result);
+      if (decoded === result) break;
+      result = decoded;
+    } catch {
+      break;
+    }
+  }
+
+  result = result.replace(LOCAL_ORIGIN_IN_TEXT, canonical);
+
+  try {
+    const parsed = new URL(result);
+    const redirectTo = parsed.searchParams.get('redirect_to');
+    if (redirectTo && /localhost|127\.0\.0\.1/i.test(redirectTo)) {
+      try {
+        const inner = new URL(redirectTo);
+        parsed.searchParams.set(
+          'redirect_to',
+          `${APP_ORIGIN}${inner.pathname}${inner.search}${inner.hash}`
+        );
+      } catch {
+        parsed.searchParams.set(
+          'redirect_to',
+          redirectTo.replace(LOCAL_ORIGIN_IN_TEXT, canonical)
+        );
+      }
+      result = parsed.toString();
+    }
+  } catch {
+    // not a valid URL — string replace above is enough
+  }
+
+  return result.replace(LOCAL_ORIGIN_IN_TEXT, canonical);
+}
+
+export function buildAppUrl(path: string, _request?: Request): string {
   const p = path.startsWith('/') ? path : `/${path}`;
-  return `${origin}${p}`;
+  return sanitizeOutboundUrl(`${resolveAppOrigin()}${p}`);
 }

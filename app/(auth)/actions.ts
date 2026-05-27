@@ -8,7 +8,7 @@ import {
   sendPasswordRecoveryEmail,
 } from '@/lib/emails/sendAuthEmail';
 import { loginSchema, signupSchema } from '@/lib/utils/validation';
-import { authCallbackUrl, rewriteAuthActionLink } from '@/lib/utils/authLinks';
+import { authCallbackUrl, prepareAuthEmailLink } from '@/lib/utils/authLinks';
 
 export type ActionResult =
   | { ok: true; redirectTo?: string; needsEmailConfirmation?: boolean; message?: string }
@@ -174,7 +174,7 @@ export async function resendConfirmationAction(
     return { ok: false, error: 'Could not create a confirmation link. Try again.' };
   }
 
-  const confirmUrl = rewriteAuthActionLink(rawUrl);
+  const confirmUrl = prepareAuthEmailLink(rawUrl);
   const fullName =
     (user?.user_metadata?.full_name as string | undefined) ??
     email.split('@')[0];
@@ -250,7 +250,7 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
       error: 'Could not create your verification link. Please try again.',
     };
   }
-  const confirmUrl = rewriteAuthActionLink(rawConfirmUrl);
+  const confirmUrl = prepareAuthEmailLink(rawConfirmUrl);
 
   const user = linkData.user;
   if (user) {
@@ -318,7 +318,7 @@ export async function forgotPasswordAction(
   if (!rawResetUrl) {
     return { ok: false, error: 'Could not create password reset link.' };
   }
-  const resetUrl = rewriteAuthActionLink(rawResetUrl);
+  const resetUrl = prepareAuthEmailLink(rawResetUrl);
 
   const emailResult = await sendPasswordRecoveryEmail({ to: email, resetUrl });
   if (!emailResult.ok) {
