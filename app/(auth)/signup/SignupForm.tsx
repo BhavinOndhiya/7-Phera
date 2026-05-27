@@ -37,8 +37,9 @@ export function SignupForm() {
         return;
       }
       if (result.needsEmailConfirmation) {
-        toast.success('Check your email for a confirmation link', {
-          description: 'Also look in spam. Guest & workspace invites use a different email system.',
+        toast.success('Confirmation email sent', {
+          description:
+            'Check your inbox (and spam) for an email from Saath Phere with a confirm button.',
           duration: 8000,
         });
       } else {

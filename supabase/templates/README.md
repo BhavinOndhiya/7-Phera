@@ -36,9 +36,21 @@ appear there.
 If you edit a template while Supabase is running, restart it for the change to
 take effect.
 
-## Hosted / production Supabase
+## Production: auth emails use Resend (not Supabase SMTP)
 
-Hosted projects ignore `config.toml`. To deploy these templates:
+Signup confirmation and password reset are sent by the **Next.js app via Resend**
+(`lib/emails/sendAuthEmail.ts`), using the same branded layout as guest invitations.
+Supabase only generates the secure link; it does **not** need to send those emails.
+
+In the Supabase Dashboard:
+
+1. **Authentication → Providers → Email** — keep **Confirm email** **ON** so users must verify before signing in.
+2. You do **not** need to paste templates below for signup/reset if the app handles mail (optional fallback only).
+3. **Authentication → URL configuration** — set Site URL + Redirect URLs (see below).
+
+## Hosted / production Supabase (optional template paste)
+
+Hosted projects ignore `config.toml`. To deploy these templates as a fallback:
 
 1. Open the project at <https://supabase.com/dashboard>.
 2. Go to **Authentication → Email Templates**.

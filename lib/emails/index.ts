@@ -21,3 +21,15 @@ export {
   workspaceInvitation,
   type WorkspaceInvitationProps,
 } from './templates/workspaceInvitation';
+export {
+  accountConfirmation,
+  type AccountConfirmationProps,
+} from './templates/accountConfirmation';
+export {
+  passwordRecovery,
+  type PasswordRecoveryProps,
+} from './templates/passwordRecovery';
+export {
+  sendAccountConfirmationEmail,
+  sendPasswordRecoveryEmail,
+} from './sendAuthEmail';

@@ -3,6 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import {
+  sendAccountConfirmationEmail,
+  sendPasswordRecoveryEmail,
+} from '@/lib/emails/sendAuthEmail';
 import { loginSchema, signupSchema } from '@/lib/utils/validation';
 import { resolveAppOrigin } from '@/lib/utils/appUrl';
 
@@ -118,16 +122,19 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const supabase = createClient();
+  const admin = createServiceRoleClient();
   const origin = resolveAppOrigin();
   const nextAfterConfirm = inviteToken
     ? `/invite/accept?token=${encodeURIComponent(inviteToken)}`
     : '/dashboard';
-  const { data, error } = await supabase.auth.signUp({
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(nextAfterConfirm)}`;
+
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    type: 'signup',
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(nextAfterConfirm)}`,
+      redirectTo,
       data: {
         full_name: parsed.data.full_name,
         role: parsed.data.role,
@@ -136,14 +143,31 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
     },
   });
 
-  if (error) {
-    return { ok: false, error: error.message };
+  if (linkError) {
+    const msg = linkError.message.toLowerCase();
+    if (msg.includes('already') || msg.includes('registered')) {
+      return {
+        ok: false,
+        error:
+          'An account with this email already exists. Sign in or reset your password.',
+      };
+    }
+    return { ok: false, error: linkError.message };
   }
 
-  if (data.user) {
+  const confirmUrl = linkData.properties?.action_link;
+  if (!confirmUrl) {
+    return {
+      ok: false,
+      error: 'Could not create your verification link. Please try again.',
+    };
+  }
+
+  const user = linkData.user;
+  if (user) {
     try {
       await bootstrapUser({
-        userId: data.user.id,
+        userId: user.id,
         email: parsed.data.email,
         fullName: parsed.data.full_name,
       });
@@ -152,16 +176,18 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
     }
   }
 
-  if (data.session) {
-    revalidatePath('/', 'layout');
-    if (inviteToken) {
-      return { ok: true, redirectTo: `/invite/accept?token=${inviteToken}` };
-    }
-    return { ok: true, redirectTo: '/dashboard' };
+  const emailResult = await sendAccountConfirmationEmail({
+    to: parsed.data.email,
+    fullName: parsed.data.full_name,
+    confirmUrl,
+  });
+
+  if (!emailResult.ok) {
+    return { ok: false, error: emailResult.error };
   }
 
   const confirmMsg =
-    'We sent a confirmation link to your email. Open it (check spam), then sign in.' +
+    'We sent a confirmation email from Saath Phere (via Resend). Open the link, then sign in.' +
     (inviteToken ? ' Your workspace invite will work after that.' : '');
   return {
     ok: true,
@@ -185,15 +211,31 @@ export async function forgotPasswordAction(
   const email = String(formData.get('email') ?? '');
   if (!email) return { ok: false, error: 'Email required' };
 
-  const supabase = createClient();
+  const admin = createServiceRoleClient();
   const origin = resolveAppOrigin();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/reset-password`,
-  });
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent('/reset-password')}`;
 
-  if (error) {
-    return { ok: false, error: error.message };
+  const { data: linkData, error: linkError } =
+    await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo },
+    });
+
+  if (linkError) {
+    return { ok: false, error: linkError.message };
   }
+
+  const resetUrl = linkData.properties?.action_link;
+  if (!resetUrl) {
+    return { ok: false, error: 'Could not create password reset link.' };
+  }
+
+  const emailResult = await sendPasswordRecoveryEmail({ to: email, resetUrl });
+  if (!emailResult.ok) {
+    return { ok: false, error: emailResult.error };
+  }
+
   return { ok: true };
 }
 
