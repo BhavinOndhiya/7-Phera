@@ -7,6 +7,7 @@ import { LogIn, Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface Row {
   id: string;
@@ -25,6 +26,7 @@ export function AdminWorkspacesTable({
   initialQuery: string;
 }) {
   const router = useRouter();
+  const { confirm } = useConfirm();
   const [q, setQ] = useState(initialQuery);
   const [rows, setRows] = useState<Row[]>(initial);
   const [isPending, startTransition] = useTransition();
@@ -39,13 +41,14 @@ export function AdminWorkspacesTable({
     router.push('/dashboard');
   }
 
-  function deleteWorkspace(row: Row) {
-    if (
-      !confirm(
-        `Delete workspace "${row.name}"? This permanently removes all events, guests, budgets, vendors and members. There is no undo.`
-      )
-    )
-      return;
+  async function deleteWorkspace(row: Row) {
+    const ok = await confirm({
+      title: 'Delete workspace',
+      description: `Delete workspace "${row.name}"? This permanently removes all events, guests, budgets, vendors and members. There is no undo.`,
+      confirmLabel: 'Delete workspace',
+      variant: 'destructive',
+    });
+    if (!ok) return;
 
     startTransition(async () => {
       const res = await fetch('/api/admin/workspaces', {

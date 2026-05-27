@@ -22,12 +22,14 @@ import {
 import { EmptyState } from '@/components/shared/EmptyState';
 import { GiftForm } from './GiftForm';
 import { useGifts } from '@/lib/hooks/useGifts';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatINR } from '@/lib/utils/formatting';
 import type { Gift } from '@/lib/types/database.types';
 
 export function GiftList({ eventId }: { eventId: string }) {
   const { gifts, loading, deleteGift, toggleClaim } = useGifts(eventId);
+  const { confirm } = useConfirm();
   const { can } = useWorkspace();
   const canEdit = can('edit_budget');
   const canDelete = can('delete_budget');
@@ -151,9 +153,13 @@ export function GiftList({ eventId }: { eventId: string }) {
                         size="icon"
                         className="h-7 w-7 text-destructive"
                         onClick={async () => {
-                          if (confirm(`Remove ${gift.name}?`)) {
-                            await deleteGift(gift.id);
-                          }
+                          const ok = await confirm({
+                            title: 'Remove gift',
+                            description: `Remove ${gift.name} from the registry?`,
+                            confirmLabel: 'Remove',
+                            variant: 'destructive',
+                          });
+                          if (ok) await deleteGift(gift.id);
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

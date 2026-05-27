@@ -21,6 +21,7 @@ import {
 import { ExpenseForm } from './ExpenseForm';
 import { PaymentTracker } from './PaymentTracker';
 import { useBudget } from '@/lib/hooks/useBudget';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatINR, formatINRShort } from '@/lib/utils/formatting';
 import { PAYMENT_STATUSES, PRIORITIES } from '@/lib/constants';
@@ -29,6 +30,7 @@ import type { BudgetItem } from '@/lib/types/database.types';
 
 export function BudgetTable({ eventId }: { eventId: string }) {
   const { budgetItems, categories, vendors, deleteItem } = useBudget(eventId);
+  const { confirm } = useConfirm();
   const { can } = useWorkspace();
   const canCreate = can('create_budget');
   const canEdit = can('edit_budget');
@@ -110,9 +112,13 @@ export function BudgetTable({ eventId }: { eventId: string }) {
                     canDelete={canDelete}
                     onEdit={() => setEditingItem(item)}
                     onDelete={async () => {
-                      if (confirm(`Delete "${item.item_name}"?`)) {
-                        await deleteItem(item.id);
-                      }
+                      const ok = await confirm({
+                        title: 'Delete expense',
+                        description: `Delete "${item.item_name}"? This cannot be undone.`,
+                        confirmLabel: 'Delete',
+                        variant: 'destructive',
+                      });
+                      if (ok) await deleteItem(item.id);
                     }}
                   />
                 ))}
@@ -140,9 +146,13 @@ export function BudgetTable({ eventId }: { eventId: string }) {
                   canDelete={canDelete}
                   onEdit={() => setEditingItem(item)}
                   onDelete={async () => {
-                    if (confirm(`Delete "${item.item_name}"?`)) {
-                      await deleteItem(item.id);
-                    }
+                    const ok = await confirm({
+                      title: 'Delete expense',
+                      description: `Delete "${item.item_name}"? This cannot be undone.`,
+                      confirmLabel: 'Delete',
+                      variant: 'destructive',
+                    });
+                    if (ok) await deleteItem(item.id);
                   }}
                 />
               ))}

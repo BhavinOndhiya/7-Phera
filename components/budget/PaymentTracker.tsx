@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { usePayments } from '@/lib/hooks/useBudget';
 import { RazorpayCheckout } from '@/components/budget/RazorpayCheckout';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatINR } from '@/lib/utils/formatting';
 import type { BudgetItem, PaymentMethod } from '@/lib/types/database.types';
@@ -64,6 +65,7 @@ export function PaymentTracker({ item }: { item: BudgetItem }) {
 
 function PaymentList({ item }: { item: BudgetItem }) {
   const supabase = createClient();
+  const { confirm } = useConfirm();
   const { payments, loading } = usePayments(item.id);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
@@ -103,7 +105,13 @@ function PaymentList({ item }: { item: BudgetItem }) {
   }
 
   async function deletePayment(id: string) {
-    if (!confirm('Delete this payment record?')) return;
+    const ok = await confirm({
+      title: 'Delete payment',
+      description: 'Delete this payment record? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     const { error } = await supabase.from('payments').delete().eq('id', id);
     if (error) toast.error(error.message);
     else toast.success('Payment deleted');

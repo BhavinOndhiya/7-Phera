@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useDocuments } from '@/lib/hooks/useDocuments';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { formatDate } from '@/lib/utils/formatting';
 import type { DocumentCategory, DocumentRow } from '@/lib/types/database.types';
 
@@ -47,6 +48,7 @@ function formatSize(bytes: number | null) {
 
 export function DocumentList({ eventId }: { eventId: string }) {
   const { documents, loading, deleteDocument } = useDocuments(eventId);
+  const { confirm } = useConfirm();
   const [filter, setFilter] = useState<DocumentCategory | 'all'>('all');
 
   const filtered = useMemo(() => {
@@ -160,9 +162,13 @@ export function DocumentList({ eventId }: { eventId: string }) {
                     size="icon"
                     className="h-8 w-8 text-destructive"
                     onClick={async () => {
-                      if (confirm(`Delete ${doc.file_name}?`)) {
-                        await deleteDocument(doc);
-                      }
+                      const ok = await confirm({
+                        title: 'Delete document',
+                        description: `Delete ${doc.file_name}? This cannot be undone.`,
+                        confirmLabel: 'Delete',
+                        variant: 'destructive',
+                      });
+                      if (ok) await deleteDocument(doc);
                     }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />

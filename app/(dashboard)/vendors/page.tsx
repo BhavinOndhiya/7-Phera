@@ -31,9 +31,11 @@ import { useVendors } from '@/lib/hooks/useVendors';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { VENDOR_CATEGORIES } from '@/lib/constants';
 import type { Vendor } from '@/lib/types/database.types';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export default function VendorsPage() {
   const { vendors, loading, deleteVendor } = useVendors();
+  const { confirm } = useConfirm();
   const { can } = useWorkspace();
   const canCreate = can('create_vendor');
   const canEdit = can('edit_vendor');
@@ -68,9 +70,13 @@ export default function VendorsPage() {
   }
 
   async function onDelete(vendor: Vendor) {
-    if (confirm(`Delete ${vendor.name}?`)) {
-      await deleteVendor(vendor.id);
-    }
+    const ok = await confirm({
+      title: 'Delete vendor',
+      description: `Delete ${vendor.name}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+    });
+    if (ok) await deleteVendor(vendor.id);
   }
 
   return (

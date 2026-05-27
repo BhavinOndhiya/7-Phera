@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   Select,
   SelectContent,
@@ -49,6 +50,7 @@ interface MemberRow {
 
 export default function CollaboratorsPage() {
   const supabase = createClient();
+  const { confirm } = useConfirm();
   const { activeWorkspace, activeWorkspaceId, can, isSuperadmin } = useWorkspace();
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
@@ -194,7 +196,13 @@ export default function CollaboratorsPage() {
 
   async function removeMember(userId: string) {
     if (!activeWorkspaceId) return;
-    if (!confirm('Remove this member?')) return;
+    const ok = await confirm({
+      title: 'Remove member',
+      description: 'Remove this member from the workspace? They will lose access immediately.',
+      confirmLabel: 'Remove',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from('workspace_members')
       .delete()

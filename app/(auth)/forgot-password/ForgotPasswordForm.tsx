@@ -32,7 +32,6 @@ export function ForgotPasswordForm() {
           Check your inbox and spam folder.
         </p>
         <p className="text-emerald-700/90">
-          The link goes to <strong>7-phera.vercel.app</strong> (not localhost).
           Use only the newest email — older links expire.
         </p>
       </div>

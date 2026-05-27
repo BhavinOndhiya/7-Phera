@@ -20,9 +20,11 @@ import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatDateLong } from '@/lib/utils/formatting';
 import type { TimelineItem as TimelineItemType } from '@/lib/types/database.types';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function TimelineView({ eventId }: { eventId: string }) {
   const { items, loading, deleteItem } = useTimeline(eventId);
+  const { confirm } = useConfirm();
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<TimelineItemType | null>(null);
 
@@ -82,9 +84,13 @@ export function TimelineView({ eventId }: { eventId: string }) {
                 item={item}
                 onEdit={() => setEditing(item)}
                 onDelete={async () => {
-                  if (confirm(`Delete "${item.title}"?`)) {
-                    await deleteItem(item.id);
-                  }
+                  const ok = await confirm({
+                    title: 'Delete timeline item',
+                    description: `Delete "${item.title}"? This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    variant: 'destructive',
+                  });
+                  if (ok) await deleteItem(item.id);
                 }}
               />
             ))}

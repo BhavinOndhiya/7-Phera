@@ -64,6 +64,7 @@ import { emitDataChanged } from '@/lib/utils/dataEvents';
 import { RSVP_STATUSES, SIDES } from '@/lib/constants';
 import type { Guest, Side, RsvpStatus } from '@/lib/types/database.types';
 import { GuestImport } from './GuestImport';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface GuestTableProps {
   eventId?: string;
@@ -104,6 +105,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const [sendingSingleId, setSendingSingleId] = useState<string | null>(null);
   const [, startSingleSendTransition] = useTransition();
   const [isBulkPending, startBulkTransition] = useTransition();
+  const { confirm } = useConfirm();
 
   const canSelect = canInvite || canDelete;
 
@@ -209,33 +211,39 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
     setSelectedIds(new Set());
   }
 
-  function bulkDeleteSelected() {
+  async function bulkDeleteSelected() {
     const ids = [...selectedIds];
     const count = ids.length;
-    const message = eventId
+    const description = eventId
       ? `Delete ${count} selected guest${count === 1 ? '' : 's'} from your workspace? They will be removed from every event. This cannot be undone.`
       : `Delete ${count} selected guest${count === 1 ? '' : 's'} from your workspace? This cannot be undone.`;
-    if (!confirm(message)) return;
+    const ok = await confirm({
+      title: count === 1 ? 'Delete guest' : `Delete ${count} guests`,
+      description,
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     startBulkTransition(async () => {
-      const ok = await deleteManyGuests(ids);
-      if (ok) clearSelection();
+      const deleted = await deleteManyGuests(ids);
+      if (deleted) clearSelection();
     });
   }
 
-  function bulkRemoveFromEvent() {
+  async function bulkRemoveFromEvent() {
     if (!eventId) return;
     const ids = [...selectedIds];
     const count = ids.length;
-    if (
-      !confirm(
-        `Remove ${count} selected guest${count === 1 ? '' : 's'} from this event only? They will stay in your guest list.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: count === 1 ? 'Remove from event' : `Remove ${count} guests`,
+      description: `Remove ${count} selected guest${count === 1 ? '' : 's'} from this event only? They will stay in your guest list.`,
+      confirmLabel: 'Remove',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     startBulkTransition(async () => {
-      const ok = await removeManyFromEvent(ids, eventId);
-      if (ok) clearSelection();
+      const removed = await removeManyFromEvent(ids, eventId);
+      if (removed) clearSelection();
     });
   }
 
@@ -727,13 +735,13 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onClick={async () => {
-                                  if (
-                                    confirm(
-                                      `Delete ${guest.full_name} from your workspace? This removes them from every event.`
-                                    )
-                                  ) {
-                                    await deleteGuest(guest.id);
-                                  }
+                                  const ok = await confirm({
+                                    title: 'Delete guest',
+                                    description: `Delete ${guest.full_name} from your workspace? This removes them from every event.`,
+                                    confirmLabel: 'Delete',
+                                    variant: 'destructive',
+                                  });
+                                  if (ok) await deleteGuest(guest.id);
                                 }}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" /> Delete from

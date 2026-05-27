@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select';
 import { TaskForm } from './TaskForm';
 import { useTasks } from '@/lib/hooks/useTasks';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
 import { formatDate, daysUntil } from '@/lib/utils/formatting';
 import { PRIORITIES } from '@/lib/constants';
@@ -70,6 +71,7 @@ const COLUMNS: {
 
 export function TasksKanban({ eventId }: { eventId: string }) {
   const { tasks, deleteTask, toggleStatus } = useTasks(eventId);
+  const { confirm } = useConfirm();
   const { can } = useWorkspace();
   const canCreate = can('create_task');
   const canEdit = can('edit_task');
@@ -126,9 +128,13 @@ export function TasksKanban({ eventId }: { eventId: string }) {
                     canDelete={canDelete}
                     onEdit={() => setEditing(task)}
                     onDelete={async () => {
-                      if (confirm(`Delete "${task.title}"?`)) {
-                        await deleteTask(task.id);
-                      }
+                      const ok = await confirm({
+                        title: 'Delete task',
+                        description: `Delete "${task.title}"? This cannot be undone.`,
+                        confirmLabel: 'Delete',
+                        variant: 'destructive',
+                      });
+                      if (ok) await deleteTask(task.id);
                     }}
                     onStatusChange={(newStatus) =>
                       toggleStatus(task.id, newStatus)

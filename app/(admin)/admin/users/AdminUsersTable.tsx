@@ -7,6 +7,7 @@ import { Search, Shield, ShieldOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface AdminUser {
   id: string;
@@ -26,6 +27,7 @@ export function AdminUsersTable({
   initialQuery: string;
 }) {
   const router = useRouter();
+  const { confirm } = useConfirm();
   const [q, setQ] = useState(initialQuery);
   const [users, setUsers] = useState<AdminUser[]>(initialUsers);
   const [isPending, startTransition] = useTransition();
@@ -60,11 +62,15 @@ export function AdminUsersTable({
   }
 
   async function toggleSuspend(u: AdminUser) {
-    if (
-      !u.is_suspended &&
-      !confirm(`Suspend ${u.full_name}? They will be unable to log in.`)
-    )
-      return;
+    if (!u.is_suspended) {
+      const ok = await confirm({
+        title: 'Suspend user',
+        description: `Suspend ${u.full_name}? They will be unable to log in.`,
+        confirmLabel: 'Suspend',
+        variant: 'destructive',
+      });
+      if (!ok) return;
+    }
     startTransition(async () => {
       const res = await fetch('/api/admin/users', {
         method: 'POST',

@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getLocale } from 'next-intl/server';
 import { Toaster } from '@/components/ui/sonner';
+import { AppProviders } from '@/components/providers/AppProviders';
 import { ServiceWorkerRegister } from '@/components/shared/ServiceWorkerRegister';
 import './globals.css';
 
@@ -74,9 +75,11 @@ export default async function RootLayout({
     <html lang={locale} suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans`}>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
-          <Toaster position="top-right" richColors closeButton />
-          <ServiceWorkerRegister />
+          <AppProviders>
+            {children}
+            <Toaster position="top-right" richColors closeButton />
+            <ServiceWorkerRegister />
+          </AppProviders>
         </NextIntlClientProvider>
       </body>
     </html>

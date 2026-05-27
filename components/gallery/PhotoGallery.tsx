@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useGallery } from '@/lib/hooks/useGallery';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function PhotoGallery({ eventId }: { eventId: string }) {
   const { photos, loading, upload, remove } = useGallery(eventId);
+  const { confirm } = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -105,7 +107,13 @@ export function PhotoGallery({ eventId }: { eventId: string }) {
                 className="absolute top-1.5 right-1.5 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={async (e) => {
                   e.stopPropagation();
-                  if (confirm('Delete this photo?')) await remove(photo.path);
+                  const ok = await confirm({
+                    title: 'Delete photo',
+                    description: 'Delete this photo from the gallery? This cannot be undone.',
+                    confirmLabel: 'Delete',
+                    variant: 'destructive',
+                  });
+                  if (ok) await remove(photo.path);
                 }}
               >
                 <Trash2 className="h-3.5 w-3.5" />
