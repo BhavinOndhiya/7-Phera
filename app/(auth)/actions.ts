@@ -7,7 +7,7 @@ import { loginSchema, signupSchema } from '@/lib/utils/validation';
 import { resolveAppOrigin } from '@/lib/utils/appUrl';
 
 export type ActionResult =
-  | { ok: true; redirectTo?: string }
+  | { ok: true; redirectTo?: string; needsEmailConfirmation?: boolean }
   | { ok: false; error: string };
 
 function parseSuperadminEmails(): Set<string> {
@@ -119,10 +119,15 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
   }
 
   const supabase = createClient();
+  const origin = resolveAppOrigin();
+  const nextAfterConfirm = inviteToken
+    ? `/invite/accept?token=${encodeURIComponent(inviteToken)}`
+    : '/dashboard';
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(nextAfterConfirm)}`,
       data: {
         full_name: parsed.data.full_name,
         role: parsed.data.role,
@@ -156,10 +161,11 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
   }
 
   const confirmMsg =
-    'Check your email to confirm your account' +
-    (inviteToken ? ', then revisit the invite link' : '');
+    'We sent a confirmation link to your email. Open it (check spam), then sign in.' +
+    (inviteToken ? ' Your workspace invite will work after that.' : '');
   return {
     ok: true,
+    needsEmailConfirmation: true,
     redirectTo: `/login?message=${encodeURIComponent(confirmMsg)}${
       inviteToken ? `&invite=${inviteToken}` : ''
     }`,

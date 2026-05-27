@@ -36,7 +36,14 @@ export function SignupForm() {
         toast.error(result.error);
         return;
       }
-      toast.success('Account created!');
+      if (result.needsEmailConfirmation) {
+        toast.success('Check your email for a confirmation link', {
+          description: 'Also look in spam. Guest & workspace invites use a different email system.',
+          duration: 8000,
+        });
+      } else {
+        toast.success('Account created!');
+      }
       router.push(result.redirectTo || '/dashboard');
       router.refresh();
     });
