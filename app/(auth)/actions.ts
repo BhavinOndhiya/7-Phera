@@ -8,7 +8,7 @@ import {
   sendPasswordRecoveryEmail,
 } from '@/lib/emails/sendAuthEmail';
 import { loginSchema, signupSchema } from '@/lib/utils/validation';
-import { authCallbackUrl, prepareAuthEmailLink } from '@/lib/utils/authLinks';
+import { authCallbackUrl, emailLinkFromGenerateLink } from '@/lib/utils/authLinks';
 
 export type ActionResult =
   | { ok: true; redirectTo?: string; needsEmailConfirmation?: boolean; message?: string }
@@ -169,12 +169,10 @@ export async function resendConfirmationAction(
     };
   }
 
-  const rawUrl = linkData.properties?.action_link;
-  if (!rawUrl) {
+  const confirmUrl = emailLinkFromGenerateLink(linkData.properties, '/dashboard');
+  if (!confirmUrl) {
     return { ok: false, error: 'Could not create a confirmation link. Try again.' };
   }
-
-  const confirmUrl = prepareAuthEmailLink(rawUrl);
   const fullName =
     (user?.user_metadata?.full_name as string | undefined) ??
     email.split('@')[0];
@@ -243,14 +241,16 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: linkError.message };
   }
 
-  const rawConfirmUrl = linkData.properties?.action_link;
-  if (!rawConfirmUrl) {
+  const confirmUrl = emailLinkFromGenerateLink(
+    linkData.properties,
+    nextAfterConfirm
+  );
+  if (!confirmUrl) {
     return {
       ok: false,
       error: 'Could not create your verification link. Please try again.',
     };
   }
-  const confirmUrl = prepareAuthEmailLink(rawConfirmUrl);
 
   const user = linkData.user;
   if (user) {
@@ -314,11 +314,13 @@ export async function forgotPasswordAction(
     return { ok: false, error: linkError.message };
   }
 
-  const rawResetUrl = linkData.properties?.action_link;
-  if (!rawResetUrl) {
+  const resetUrl = emailLinkFromGenerateLink(
+    linkData.properties,
+    '/reset-password'
+  );
+  if (!resetUrl) {
     return { ok: false, error: 'Could not create password reset link.' };
   }
-  const resetUrl = prepareAuthEmailLink(rawResetUrl);
 
   const emailResult = await sendPasswordRecoveryEmail({ to: email, resetUrl });
   if (!emailResult.ok) {
