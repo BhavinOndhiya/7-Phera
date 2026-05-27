@@ -35,7 +35,12 @@ export function resolveAppOrigin(request?: Request): string {
     return stripTrailingSlash(fromEnv);
   }
 
-  if (process.env.VERCEL === '1' || process.env.VERCEL === 'true') {
+  // Any Vercel deployment (preview or production) should not emit localhost in emails.
+  if (
+    process.env.VERCEL === '1' ||
+    process.env.VERCEL === 'true' ||
+    process.env.VERCEL_URL
+  ) {
     return PRODUCTION_ORIGIN;
   }
 

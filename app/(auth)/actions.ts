@@ -8,7 +8,7 @@ import {
   sendPasswordRecoveryEmail,
 } from '@/lib/emails/sendAuthEmail';
 import { loginSchema, signupSchema } from '@/lib/utils/validation';
-import { resolveAppOrigin } from '@/lib/utils/appUrl';
+import { authCallbackUrl, rewriteAuthActionLink } from '@/lib/utils/authLinks';
 
 export type ActionResult =
   | { ok: true; redirectTo?: string; needsEmailConfirmation?: boolean }
@@ -123,11 +123,10 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
   }
 
   const admin = createServiceRoleClient();
-  const origin = resolveAppOrigin();
   const nextAfterConfirm = inviteToken
     ? `/invite/accept?token=${encodeURIComponent(inviteToken)}`
     : '/dashboard';
-  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(nextAfterConfirm)}`;
+  const redirectTo = authCallbackUrl(nextAfterConfirm);
 
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'signup',
@@ -155,13 +154,14 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: linkError.message };
   }
 
-  const confirmUrl = linkData.properties?.action_link;
-  if (!confirmUrl) {
+  const rawConfirmUrl = linkData.properties?.action_link;
+  if (!rawConfirmUrl) {
     return {
       ok: false,
       error: 'Could not create your verification link. Please try again.',
     };
   }
+  const confirmUrl = rewriteAuthActionLink(rawConfirmUrl);
 
   const user = linkData.user;
   if (user) {
@@ -212,8 +212,7 @@ export async function forgotPasswordAction(
   if (!email) return { ok: false, error: 'Email required' };
 
   const admin = createServiceRoleClient();
-  const origin = resolveAppOrigin();
-  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent('/reset-password')}`;
+  const redirectTo = authCallbackUrl('/reset-password');
 
   const { data: linkData, error: linkError } =
     await admin.auth.admin.generateLink({
@@ -226,10 +225,11 @@ export async function forgotPasswordAction(
     return { ok: false, error: linkError.message };
   }
 
-  const resetUrl = linkData.properties?.action_link;
-  if (!resetUrl) {
+  const rawResetUrl = linkData.properties?.action_link;
+  if (!rawResetUrl) {
     return { ok: false, error: 'Could not create password reset link.' };
   }
+  const resetUrl = rewriteAuthActionLink(rawResetUrl);
 
   const emailResult = await sendPasswordRecoveryEmail({ to: email, resetUrl });
   if (!emailResult.ok) {
