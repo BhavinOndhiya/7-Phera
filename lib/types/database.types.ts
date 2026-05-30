@@ -447,6 +447,8 @@ export type Database = {
           status: TaskStatus;
           assigned_to: string | null;
           completed_at: string | null;
+          in_progress_at: string | null;
+          cancelled_at: string | null;
           workspace_id: string | null;
           created_at: string;
           updated_at: string;
@@ -462,6 +464,8 @@ export type Database = {
           status?: TaskStatus;
           assigned_to?: string | null;
           completed_at?: string | null;
+          in_progress_at?: string | null;
+          cancelled_at?: string | null;
           workspace_id?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -477,9 +481,29 @@ export type Database = {
           status?: TaskStatus;
           assigned_to?: string | null;
           completed_at?: string | null;
+          in_progress_at?: string | null;
+          cancelled_at?: string | null;
           workspace_id?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      task_reminder_sent: {
+        Row: {
+          task_id: string;
+          reminder_type: 'due_in_7_days' | 'due_in_1_day';
+          sent_at: string;
+        };
+        Insert: {
+          task_id: string;
+          reminder_type: 'due_in_7_days' | 'due_in_1_day';
+          sent_at?: string;
+        };
+        Update: {
+          task_id?: string;
+          reminder_type?: 'due_in_7_days' | 'due_in_1_day';
+          sent_at?: string;
         };
         Relationships: [];
       };
@@ -840,6 +864,10 @@ export type BudgetItem = Tables<'budget_items'>;
 export type Vendor = Tables<'vendors'>;
 export type Payment = Tables<'payments'>;
 export type Task = Tables<'tasks'>;
+export type TaskWithAssignee = Task & {
+  assignee: { id: string; full_name: string | null } | null;
+};
+export type TaskReminderSent = Tables<'task_reminder_sent'>;
 export type DocumentRow = Tables<'documents'>;
 export type TimelineItem = Tables<'timeline_items'>;
 export type VendorReview = Tables<'vendor_reviews'>;

@@ -33,3 +33,13 @@ export {
   sendAccountConfirmationEmail,
   sendPasswordRecoveryEmail,
 } from './sendAuthEmail';
+export {
+  sendTaskAssignedEmail,
+  sendTaskDueReminderEmail,
+} from './sendTaskEmail';
+export { taskAssigned, type TaskAssignedProps } from './templates/taskAssigned';
+export {
+  taskDueReminder,
+  type TaskDueReminderProps,
+  type TaskReminderItem,
+} from './templates/taskDueReminder';

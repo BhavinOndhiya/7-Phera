@@ -1,14 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, ListChecks } from 'lucide-react';
+import { ArrowRight, ListChecks, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useEvents } from '@/lib/hooks/useEvents';
 import { useTasks } from '@/lib/hooks/useTasks';
-import { formatDate, daysUntil } from '@/lib/utils/formatting';
+import { formatDate, formatDateTime, daysUntil } from '@/lib/utils/formatting';
+import { PRIORITIES } from '@/lib/constants';
 
 export default function AllTasksPage() {
   const { events } = useEvents();
@@ -58,23 +59,39 @@ export default function AllTasksPage() {
               const event = events.find((e) => e.id === task.event_id);
               const days = task.due_date ? daysUntil(task.due_date) : null;
               const overdue = days !== null && days < 0;
+              const priority = PRIORITIES.find((p) => p.value === task.priority);
               return (
                 <div
                   key={task.id}
                   className="flex items-center justify-between p-4 gap-3 hover:bg-muted/30 transition-colors"
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 space-y-1">
                     <p className="font-medium">{task.title}</p>
-                    {event && (
-                      <Link
-                        href={`/events/${event.id}`}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        {event.name}
-                      </Link>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      {event && (
+                        <Link
+                          href={`/events/${event.id}`}
+                          className="hover:text-foreground"
+                        >
+                          {event.name}
+                        </Link>
+                      )}
+                      <span className="inline-flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {task.assignee?.full_name ?? 'Unassigned'}
+                      </span>
+                      <span>Created {formatDateTime(task.created_at)}</span>
+                      {task.in_progress_at && (
+                        <span>Started {formatDateTime(task.in_progress_at)}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {priority && (
+                      <Badge variant="outline" className={`text-xs ${priority.color}`}>
+                        {priority.label}
+                      </Badge>
+                    )}
                     {task.due_date && (
                       <Badge
                         variant={overdue ? 'destructive' : 'outline'}

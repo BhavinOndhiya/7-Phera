@@ -16,11 +16,13 @@ import {
 } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
+import { buildStatusPayload } from '@/lib/utils/taskStatus';
 import type {
   Task,
   Priority,
   TaskStatus,
 } from '@/lib/types/database.types';
+import { TaskTimestampPanel } from './TaskTimestampPanel';
 
 interface TaskFormProps {
   eventId: string;
@@ -73,7 +75,9 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
       toast.error('Title is required');
       return;
     }
+    const previousAssignee = initial?.assigned_to ?? null;
     startTransition(async () => {
+      const statusPayload = buildStatusPayload(form.status, initial ?? undefined);
       const payload = {
         event_id: eventId,
         title: form.title.trim(),
@@ -81,11 +85,10 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
         category: form.category || null,
         due_date: form.due_date || null,
         priority: form.priority,
-        status: form.status,
         assigned_to: form.assigned_to || null,
-        completed_at:
-          form.status === 'completed' ? new Date().toISOString() : null,
+        ...statusPayload,
       };
+      let taskId = initial?.id;
       if (initial) {
         const { error } = await supabase
           .from('tasks')
@@ -101,15 +104,36 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
           toast.error('Pick a workspace first');
           return;
         }
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('tasks')
-          .insert({ ...payload, workspace_id: workspaceId });
+          .insert({ ...payload, workspace_id: workspaceId })
+          .select('id')
+          .single();
         if (error) {
           toast.error(error.message);
           return;
         }
+        taskId = data.id;
         toast.success('Task added');
       }
+
+      const newAssignee = form.assigned_to || null;
+      if (taskId && newAssignee && newAssignee !== previousAssignee) {
+        try {
+          const res = await fetch('/api/tasks/notify-assignment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.sentTo) {
+            toast.success(`Assignment email sent to ${data.sentTo}`);
+          }
+        } catch {
+          // assignment saved; email is best-effort
+        }
+      }
+
       onDone?.();
     });
   }
@@ -220,6 +244,8 @@ export function TaskForm({ eventId, initial, onDone }: TaskFormProps) {
           </Select>
         </div>
       </div>
+
+      {initial && <TaskTimestampPanel task={initial} />}
 
       <div className="flex justify-end gap-2 pt-4 border-t">
         {onDone && (

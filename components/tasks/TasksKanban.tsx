@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Circle,
   Clock,
@@ -11,6 +11,9 @@ import {
   Edit,
   Trash2,
   CalendarClock,
+  Filter,
+  User,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,12 +38,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TaskForm } from './TaskForm';
+import { AddTaskToCalendarButton } from './AddTaskToCalendarButton';
 import { useTasks } from '@/lib/hooks/useTasks';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useWorkspace } from '@/lib/hooks/useWorkspace';
-import { formatDate, daysUntil } from '@/lib/utils/formatting';
+import { useEvent } from '@/lib/hooks/useEvents';
+import { createClient } from '@/lib/supabase/client';
+import { formatDate, formatDateTime, daysUntil } from '@/lib/utils/formatting';
 import { PRIORITIES } from '@/lib/constants';
-import type { Task, TaskStatus } from '@/lib/types/database.types';
+import type {
+  Priority,
+  TaskStatus,
+  TaskWithAssignee,
+} from '@/lib/types/database.types';
 
 const COLUMNS: {
   key: TaskStatus;
@@ -70,31 +80,104 @@ const COLUMNS: {
 ];
 
 export function TasksKanban({ eventId }: { eventId: string }) {
+  const supabase = createClient();
   const { tasks, deleteTask, toggleStatus } = useTasks(eventId);
+  const { event } = useEvent(eventId);
   const { confirm } = useConfirm();
-  const { can } = useWorkspace();
+  const { can, activeWorkspaceId } = useWorkspace();
   const canCreate = can('create_task');
   const canEdit = can('edit_task');
   const canDelete = can('delete_task');
   const [addOpen, setAddOpen] = useState(false);
-  const [editing, setEditing] = useState<Task | null>(null);
+  const [editing, setEditing] = useState<TaskWithAssignee | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
+  const [members, setMembers] = useState<
+    { id: string; full_name: string | null }[]
+  >([]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    void (async () => {
+      const { data: rows } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', activeWorkspaceId);
+      const ids = (rows ?? []).map((r) => r.user_id);
+      if (ids.length === 0) {
+        setMembers([]);
+        return;
+      }
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .in('id', ids);
+      setMembers(users ?? []);
+    })();
+  }, [supabase, activeWorkspaceId]);
+
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, { label: string; count: number }>();
+    for (const t of tasks) {
+      const label = t.category?.trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      const prev = counts.get(key);
+      if (prev) prev.count++;
+      else counts.set(key, { label, count: 1 });
+    }
+    return [...counts.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+    );
+  }, [tasks]);
+
+  const assigneeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    let unassigned = 0;
+    for (const t of tasks) {
+      if (t.assigned_to) {
+        counts.set(t.assigned_to, (counts.get(t.assigned_to) ?? 0) + 1);
+      } else {
+        unassigned++;
+      }
+    }
+    return { counts, unassigned };
+  }, [tasks]);
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      const matchesAssignee =
+        assigneeFilter === 'all' ||
+        (assigneeFilter === 'unassigned'
+          ? !t.assigned_to
+          : t.assigned_to === assigneeFilter);
+      const matchesCategory =
+        categoryFilter === 'all' ||
+        (t.category?.trim().toLowerCase() ?? '') === categoryFilter;
+      const matchesPriority =
+        priorityFilter === 'all' || t.priority === priorityFilter;
+      return matchesAssignee && matchesCategory && matchesPriority;
+    });
+  }, [tasks, assigneeFilter, categoryFilter, priorityFilter]);
 
   const grouped = useMemo(() => {
-    const byStatus: Record<TaskStatus, Task[]> = {
+    const byStatus: Record<TaskStatus, TaskWithAssignee[]> = {
       todo: [],
       in_progress: [],
       completed: [],
       cancelled: [],
     };
-    for (const t of tasks) byStatus[t.status].push(t);
+    for (const t of filteredTasks) byStatus[t.status].push(t);
     return byStatus;
-  }, [tasks]);
+  }, [filteredTasks]);
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="font-serif text-xl font-semibold">
-          {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+          {filteredTasks.length} of {tasks.length}{' '}
+          {tasks.length === 1 ? 'task' : 'tasks'}
         </h2>
         {canCreate && (
           <Button
@@ -104,6 +187,67 @@ export function TasksKanban({ eventId }: { eventId: string }) {
             <Plus className="h-4 w-4 mr-2" /> Add task
           </Button>
         )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+          <SelectTrigger className="w-[180px]">
+            <User className="h-3 w-3 mr-1.5 opacity-50" />
+            <SelectValue placeholder="All assignees" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All assignees</SelectItem>
+            {assigneeCounts.unassigned > 0 && (
+              <SelectItem value="unassigned">
+                Unassigned ({assigneeCounts.unassigned})
+              </SelectItem>
+            )}
+            {members.map((m) => {
+              const count = assigneeCounts.counts.get(m.id) ?? 0;
+              if (count === 0) return null;
+              return (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.full_name ?? 'Member'} ({count})
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
+        {categoryOptions.length > 0 && (
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[160px]">
+              <Tag className="h-3 w-3 mr-1.5 opacity-50" />
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categoryOptions.map(({ label, count }) => (
+                <SelectItem key={label.toLowerCase()} value={label.toLowerCase()}>
+                  {label} ({count})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <Select
+          value={priorityFilter}
+          onValueChange={(v) => setPriorityFilter(v as Priority | 'all')}
+        >
+          <SelectTrigger className="w-[140px]">
+            <Filter className="h-3 w-3 mr-1.5 opacity-50" />
+            <SelectValue placeholder="All priorities" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All priorities</SelectItem>
+            {PRIORITIES.map((p) => (
+              <SelectItem key={p.value} value={p.value}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -124,6 +268,7 @@ export function TasksKanban({ eventId }: { eventId: string }) {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    eventName={event?.name}
                     canEdit={canEdit}
                     canDelete={canDelete}
                     onEdit={() => setEditing(task)}
@@ -153,7 +298,7 @@ export function TasksKanban({ eventId }: { eventId: string }) {
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add task</DialogTitle>
           </DialogHeader>
@@ -162,7 +307,7 @@ export function TasksKanban({ eventId }: { eventId: string }) {
       </Dialog>
 
       <Dialog open={Boolean(editing)} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit task</DialogTitle>
           </DialogHeader>
@@ -181,13 +326,15 @@ export function TasksKanban({ eventId }: { eventId: string }) {
 
 function TaskCard({
   task,
+  eventName,
   canEdit,
   canDelete,
   onEdit,
   onDelete,
   onStatusChange,
 }: {
-  task: Task;
+  task: TaskWithAssignee;
+  eventName?: string;
   canEdit: boolean;
   canDelete: boolean;
   onEdit: () => void;
@@ -196,7 +343,9 @@ function TaskCard({
 }) {
   const priority = PRIORITIES.find((p) => p.value === task.priority);
   const days = task.due_date ? daysUntil(task.due_date) : null;
-  const overdue = days !== null && days < 0 && task.status !== 'completed';
+  const overdue =
+    days !== null && days < 0 && task.status !== 'completed' && task.status !== 'cancelled';
+  const assigneeLabel = task.assignee?.full_name ?? 'Unassigned';
 
   return (
     <Card className="p-3 space-y-2 hover:shadow-md transition-shadow">
@@ -241,6 +390,11 @@ function TaskCard({
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
+        {task.category && (
+          <Badge variant="secondary" className="text-xs">
+            {task.category}
+          </Badge>
+        )}
         {priority && (
           <Badge variant="outline" className={`text-xs ${priority.color}`}>
             {priority.label}
@@ -257,6 +411,40 @@ function TaskCard({
           </span>
         )}
       </div>
+
+      <div className="space-y-0.5 text-[11px] text-muted-foreground border-t pt-2">
+        <p>
+          <span className="text-foreground/70">Assigned:</span> {assigneeLabel}
+        </p>
+        <p>
+          <span className="text-foreground/70">Created:</span>{' '}
+          {formatDateTime(task.created_at)}
+        </p>
+        {task.in_progress_at && (
+          <p>
+            <span className="text-foreground/70">Started:</span>{' '}
+            {formatDateTime(task.in_progress_at)}
+          </p>
+        )}
+        {task.completed_at && (
+          <p>
+            <span className="text-foreground/70">Completed:</span>{' '}
+            {formatDateTime(task.completed_at)}
+          </p>
+        )}
+      </div>
+
+      {task.due_date && (
+        <AddTaskToCalendarButton
+          compact
+          task={{
+            title: task.title,
+            description: task.description,
+            dueDate: task.due_date,
+            eventName,
+          }}
+        />
+      )}
 
       <Select
         value={task.status}

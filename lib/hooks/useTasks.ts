@@ -6,15 +6,17 @@ import { createClient } from '@/lib/supabase/client';
 import { useOptionalWorkspace } from '@/lib/hooks/useWorkspace';
 import type {
   Task,
+  TaskWithAssignee,
   InsertTables,
   UpdateTables,
 } from '@/lib/types/database.types';
+import { buildStatusPayload } from '@/lib/utils/taskStatus';
 
 export function useTasks(eventId?: string) {
   const supabase = createClient();
   const ws = useOptionalWorkspace();
   const workspaceId = ws?.activeWorkspaceId ?? null;
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchTasks = useCallback(async () => {
@@ -26,17 +28,26 @@ export function useTasks(eventId?: string) {
     const query = eventId
       ? supabase
           .from('tasks')
-          .select('*')
+          .select('*, assignee:users!assigned_to(id, full_name)')
           .eq('event_id', eventId)
           .order('due_date', { ascending: true, nullsFirst: false })
       : supabase
           .from('tasks')
-          .select('*')
+          .select('*, assignee:users!assigned_to(id, full_name)')
           .eq('workspace_id', workspaceId!)
           .order('due_date', { ascending: true, nullsFirst: false });
     const { data, error } = await query;
     if (error) toast.error(`Failed to load tasks: ${error.message}`);
-    else setTasks(data ?? []);
+    else
+      setTasks(
+        (data ?? []).map((row) => {
+          const { assignee, ...task } = row as TaskWithAssignee & {
+            assignee: TaskWithAssignee['assignee'] | TaskWithAssignee['assignee'][];
+          };
+          const a = Array.isArray(assignee) ? assignee[0] : assignee;
+          return { ...task, assignee: a ?? null } as TaskWithAssignee;
+        })
+      );
     setLoading(false);
   }, [supabase, eventId, workspaceId]);
 
@@ -96,10 +107,8 @@ export function useTasks(eventId?: string) {
   }
 
   async function toggleStatus(id: string, status: Task['status']) {
-    const updates: UpdateTables<'tasks'> = {
-      status,
-      completed_at: status === 'completed' ? new Date().toISOString() : null,
-    };
+    const existing = tasks.find((t) => t.id === id);
+    const updates = buildStatusPayload(status, existing);
     return updateTask(id, updates);
   }
 
