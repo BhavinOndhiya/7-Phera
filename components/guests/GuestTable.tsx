@@ -95,6 +95,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const canInvite = canEdit;
   const [search, setSearch] = useState('');
   const [sideFilter, setSideFilter] = useState<Side | 'all'>('all');
+  const [relationFilter, setRelationFilter] = useState<string>('all');
   const [rsvpFilter, setRsvpFilter] = useState<RsvpStatus | 'all'>('all');
   const [checkinFilter, setCheckinFilter] = useState<'all' | 'in' | 'out'>('all');
   const [eventFilter, setEventFilter] = useState<string>('all');
@@ -117,6 +118,27 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
     return m;
   }, [events]);
 
+  /** Unique relations in the guest list (case-insensitive merge). */
+  const relationOptions = useMemo(() => {
+    const map = new Map<string, { label: string; count: number }>();
+    for (const g of guests) {
+      const label = g.relation.trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      const existing = map.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(key, { label, count: 1 });
+      }
+    }
+    return [...map.entries()]
+      .sort((a, b) =>
+        a[1].label.localeCompare(b[1].label, undefined, { sensitivity: 'base' })
+      )
+      .map(([key, { label, count }]) => ({ key, label, count }));
+  }, [guests]);
+
   const filtered = useMemo(() => {
     return guests.filter((g) => {
       const matchesSearch =
@@ -126,6 +148,9 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
         g.phone?.toLowerCase().includes(search.toLowerCase()) ||
         g.email?.toLowerCase().includes(search.toLowerCase());
       const matchesSide = sideFilter === 'all' || g.side === sideFilter;
+      const matchesRelation =
+        relationFilter === 'all' ||
+        g.relation.trim().toLowerCase() === relationFilter;
       const matchesRsvp = rsvpFilter === 'all' || g.rsvp_status === rsvpFilter;
       const isIn = Boolean(attendance[g.id]?.attended);
       const matchesCheckin =
@@ -141,6 +166,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
       return (
         matchesSearch &&
         matchesSide &&
+        matchesRelation &&
         matchesRsvp &&
         matchesCheckin &&
         matchesEvent
@@ -150,6 +176,7 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
     guests,
     search,
     sideFilter,
+    relationFilter,
     rsvpFilter,
     checkinFilter,
     eventFilter,
@@ -157,6 +184,13 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
     guestEvents,
     attendance,
   ]);
+
+  useEffect(() => {
+    if (relationFilter === 'all') return;
+    if (!relationOptions.some((o) => o.key === relationFilter)) {
+      setRelationFilter('all');
+    }
+  }, [relationFilter, relationOptions]);
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -386,6 +420,22 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
             ))}
           </SelectContent>
         </Select>
+        {relationOptions.length > 0 && (
+          <Select value={relationFilter} onValueChange={setRelationFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Users className="h-3 w-3 mr-1.5 opacity-50" />
+              <SelectValue placeholder="All relations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All relations</SelectItem>
+              {relationOptions.map(({ key, label, count }) => (
+                <SelectItem key={key} value={key}>
+                  {label} ({count})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select
           value={rsvpFilter}
           onValueChange={(v) => setRsvpFilter(v as RsvpStatus | 'all')}
