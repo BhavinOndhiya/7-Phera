@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, Receipt } from 'lucide-react';
+import { Loader2, Plus, Trash2, Receipt, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +22,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { usePayments } from '@/lib/hooks/useBudget';
-import { RazorpayCheckout } from '@/components/budget/RazorpayCheckout';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatINR } from '@/lib/utils/formatting';
@@ -34,8 +33,13 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'upi', label: 'UPI' },
   { value: 'bank_transfer', label: 'Bank transfer' },
   { value: 'cheque', label: 'Cheque' },
-  { value: 'razorpay', label: 'Razorpay' },
 ];
+
+const RECEIPT_BUCKET = 'event-documents';
+const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+
+const RECEIPT_ACCEPT =
+  'image/jpeg,image/png,image/webp,image/gif,application/pdf';
 
 export function PaymentTracker({ item }: { item: BudgetItem }) {
   const [open, setOpen] = useState(false);
@@ -67,7 +71,9 @@ function PaymentList({ item }: { item: BudgetItem }) {
   const supabase = createClient();
   const { confirm } = useConfirm();
   const { payments, loading } = usePayments(item.id);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [form, setForm] = useState({
     amount: '',
     payment_date: new Date().toISOString().split('T')[0],
@@ -75,6 +81,28 @@ function PaymentList({ item }: { item: BudgetItem }) {
     transaction_id: '',
     notes: '',
   });
+
+  async function uploadReceipt(file: File): Promise<string | null> {
+    if (!item.event_id) {
+      toast.error('Budget item is missing an event');
+      return null;
+    }
+    if (file.size > MAX_RECEIPT_BYTES) {
+      toast.error('Receipt too large (max 10 MB)');
+      return null;
+    }
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const path = `${item.event_id}/payment-receipts/${item.id}/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage
+      .from(RECEIPT_BUCKET)
+      .upload(path, file, { upsert: false, contentType: file.type });
+    if (error) {
+      toast.error(`Upload failed: ${error.message}`);
+      return null;
+    }
+    const { data } = supabase.storage.from(RECEIPT_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
+  }
 
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const totalCost = Number(item.actual_cost ?? item.estimated_cost ?? 0);
@@ -87,6 +115,12 @@ function PaymentList({ item }: { item: BudgetItem }) {
       return;
     }
     startTransition(async () => {
+      let receiptUrl: string | null = null;
+      if (receiptFile) {
+        receiptUrl = await uploadReceipt(receiptFile);
+        if (!receiptUrl) return;
+      }
+
       const { error } = await supabase.from('payments').insert({
         budget_item_id: item.id,
         amount: Number(form.amount),
@@ -94,6 +128,7 @@ function PaymentList({ item }: { item: BudgetItem }) {
         payment_method: form.payment_method,
         transaction_id: form.transaction_id || null,
         notes: form.notes || null,
+        receipt_url: receiptUrl,
       });
       if (error) {
         toast.error(error.message);
@@ -101,6 +136,8 @@ function PaymentList({ item }: { item: BudgetItem }) {
       }
       toast.success('Payment recorded');
       setForm({ ...form, amount: '', transaction_id: '', notes: '' });
+      setReceiptFile(null);
+      if (receiptInputRef.current) receiptInputRef.current.value = '';
     });
   }
 
@@ -137,19 +174,6 @@ function PaymentList({ item }: { item: BudgetItem }) {
           </p>
         </div>
       </div>
-
-      {remaining > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <RazorpayCheckout
-            item={item}
-            amountRupee={remaining}
-            onPaid={() => window.location.reload()}
-          />
-          <p className="text-xs text-muted-foreground">
-            Requires Razorpay keys in environment.
-          </p>
-        </div>
-      )}
 
       <form
         onSubmit={addPayment}
@@ -228,6 +252,51 @@ function PaymentList({ item }: { item: BudgetItem }) {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="receipt" className="text-xs">
+              Receipt (image or PDF)
+            </Label>
+            <input
+              ref={receiptInputRef}
+              id="receipt"
+              type="file"
+              accept={RECEIPT_ACCEPT}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setReceiptFile(file);
+              }}
+            />
+            {receiptFile ? (
+              <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate flex-1">{receiptFile.name}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  onClick={() => {
+                    setReceiptFile(null);
+                    if (receiptInputRef.current) receiptInputRef.current.value = '';
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full justify-start font-normal text-muted-foreground"
+                onClick={() => receiptInputRef.current?.click()}
+              >
+                <Paperclip className="h-4 w-4 mr-2" />
+                Attach screenshot or receipt
+              </Button>
+            )}
+          </div>
         </div>
         <Button
           type="submit"
@@ -267,6 +336,17 @@ function PaymentList({ item }: { item: BudgetItem }) {
               </div>
               {p.notes && (
                 <p className="text-xs text-muted-foreground mt-1">{p.notes}</p>
+              )}
+              {p.receipt_url && (
+                <a
+                  href={p.receipt_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-rose-600 hover:underline mt-1"
+                >
+                  <Paperclip className="h-3 w-3" />
+                  View receipt
+                </a>
               )}
             </div>
             <Button
