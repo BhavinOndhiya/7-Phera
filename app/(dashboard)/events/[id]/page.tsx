@@ -72,17 +72,27 @@ export default async function EventDetailPage({
 
   const { data: eventGuestRows } = await supabase
     .from('event_guests')
-    .select('rsvp_status, guest:guests(party_size)')
+    .select('guest_id, rsvp_status')
     .eq('event_id', event.id);
 
+  const guestIds = (eventGuestRows ?? []).map((row) => row.guest_id);
+  const { data: guestRows } =
+    guestIds.length > 0
+      ? await supabase
+          .from('guests')
+          .select('id, party_size')
+          .in('id', guestIds)
+      : { data: [] as { id: string; party_size: number | null }[] };
+
+  const partyByGuestId = new Map(
+    (guestRows ?? []).map((g) => [g.id, g.party_size])
+  );
+
   const rsvpStats = calculateRsvpStats(
-    (eventGuestRows ?? []).map((row) => {
-      const guest = Array.isArray(row.guest) ? row.guest[0] : row.guest;
-      return {
-        rsvp_status: row.rsvp_status ?? 'pending',
-        party_size: guest?.party_size ?? 1,
-      };
-    })
+    (eventGuestRows ?? []).map((row) => ({
+      rsvp_status: row.rsvp_status ?? 'pending',
+      party_size: partyByGuestId.get(row.guest_id) ?? 1,
+    }))
   );
 
   const tasks = tasksResult.data ?? [];
