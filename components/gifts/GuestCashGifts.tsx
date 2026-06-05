@@ -10,9 +10,20 @@ import {
   Info,
   IndianRupee,
   Trash2,
+  Plus,
+  ChevronsUpDown,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -112,14 +123,27 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
   const workspaceId = ws?.activeWorkspaceId ?? null;
   const canEdit = ws?.can('edit_guest') ?? false;
   const { guests } = useGuests({ eventId });
-  const { rows, loading, totalInr, deleteContribution, refresh } =
-    useGuestContributions(eventId);
+  const {
+    rows,
+    loading,
+    totalInr,
+    upsertContribution,
+    deleteContribution,
+    refresh,
+  } = useGuestContributions(eventId);
   const { confirm } = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [parsedRows, setParsedRows] = useState<ImportRow[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [guestSearch, setGuestSearch] = useState('');
+  const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('');
+  const [receivedAt, setReceivedAt] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const guestsByName = useMemo(() => {
     const map = new Map<string, Guest>();
@@ -133,6 +157,77 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
     () => new Set(rows.map((r) => r.guest_id)),
     [rows]
   );
+
+  const existingByGuestId = useMemo(() => {
+    const map = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) map.set(row.guest_id, row);
+    return map;
+  }, [rows]);
+
+  const filteredGuestOptions = useMemo(() => {
+    const q = guestSearch.trim().toLowerCase();
+    return guests.filter(
+      (g) =>
+        !q ||
+        g.full_name.toLowerCase().includes(q) ||
+        g.relation.toLowerCase().includes(q) ||
+        g.phone?.toLowerCase().includes(q) ||
+        g.email?.toLowerCase().includes(q)
+    );
+  }, [guests, guestSearch]);
+
+  function selectGuest(guest: Guest) {
+    setSelectedGuest(guest);
+    const existing = existingByGuestId.get(guest.id);
+    if (existing) {
+      setAmount(String(existing.amount_inr));
+      setNotes(existing.notes ?? '');
+      setReceivedAt(existing.received_at ?? '');
+    } else {
+      setAmount('');
+      setNotes('');
+      setReceivedAt('');
+    }
+    setGuestPickerOpen(false);
+    setGuestSearch('');
+  }
+
+  function resetAddForm() {
+    setSelectedGuest(null);
+    setAmount('');
+    setNotes('');
+    setReceivedAt('');
+    setGuestSearch('');
+  }
+
+  async function saveContribution() {
+    if (!selectedGuest) {
+      toast.error('Pick a guest from the list');
+      return;
+    }
+    const parsed = parseAmount(amount);
+    if (parsed === null) {
+      toast.error('Enter a valid shagun amount');
+      return;
+    }
+    setSaving(true);
+    const ok = await upsertContribution({
+      event_id: eventId,
+      guest_id: selectedGuest.id,
+      amount_inr: parsed,
+      notes: notes.trim() || null,
+      received_at: receivedAt || null,
+    });
+    setSaving(false);
+    if (ok) {
+      toast.success(
+        existingByGuestId.has(selectedGuest.id)
+          ? `Updated shagun for ${selectedGuest.full_name}`
+          : `Recorded shagun for ${selectedGuest.full_name}`
+      );
+      resetAddForm();
+    }
+  }
 
   async function parseFile(file: File) {
     setFileName(file.name);
@@ -275,12 +370,147 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
       <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-950">
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
         <p>
-          Record shagun / cash gifts from each guest for your memory. Match guests
-          by <span className="font-medium">exact name</span> (same as your guest
-          list). Import a spreadsheet with <span className="font-mono">full_name</span>{' '}
-          and <span className="font-mono">amount_inr</span> columns.
+          Record shagun / cash gifts from each guest for your memory. Add one at a
+          time below, or import a spreadsheet with{' '}
+          <span className="font-mono">full_name</span> and{' '}
+          <span className="font-mono">amount_inr</span> columns.
         </p>
       </div>
+
+      {canEdit && guests.length > 0 && (
+        <div className="rounded-lg border bg-card p-4 space-y-4">
+          <h3 className="font-medium text-sm">Add shagun</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto] lg:items-end">
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+              <Label htmlFor="shagun-guest">Guest</Label>
+              <Popover open={guestPickerOpen} onOpenChange={setGuestPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="shagun-guest"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={guestPickerOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    <span className="truncate">
+                      {selectedGuest ? (
+                        selectedGuest.full_name
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Search guest…
+                        </span>
+                      )}
+                    </span>
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start"
+                >
+                  <div className="border-b p-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={guestSearch}
+                        onChange={(e) => setGuestSearch(e.target.value)}
+                        placeholder="Search by name, relation…"
+                        className="h-8 pl-8"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto p-1">
+                    {filteredGuestOptions.length === 0 ? (
+                      <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                        No guests match your search.
+                      </p>
+                    ) : (
+                      filteredGuestOptions.map((guest) => {
+                        const hasEntry = contributedGuestIds.has(guest.id);
+                        return (
+                          <button
+                            key={guest.id}
+                            type="button"
+                            className={cn(
+                              'w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted',
+                              selectedGuest?.id === guest.id && 'bg-rose-50'
+                            )}
+                            onClick={() => selectGuest(guest)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium truncate">
+                                {guest.full_name}
+                              </span>
+                              {hasEntry && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] shrink-0"
+                                >
+                                  Recorded
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {guest.relation} · {guest.side}
+                            </p>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="shagun-amount">Amount (₹)</Label>
+              <Input
+                id="shagun-amount"
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                placeholder="e.g. 5100"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="shagun-notes">Notes (optional)</Label>
+              <Input
+                id="shagun-notes"
+                placeholder="Shagun envelope, UPI…"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+
+            <Button
+              className="bg-rose-500 hover:bg-rose-600 w-full sm:col-span-2 lg:col-span-1"
+              disabled={saving || !selectedGuest}
+              onClick={() => void saveContribution()}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {selectedGuest && existingByGuestId.has(selectedGuest.id)
+                    ? 'Update'
+                    : 'Add'}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {canEdit && guests.length === 0 && (
+        <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-4 text-center">
+          Add guests to this event first, then record shagun amounts here.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -316,8 +546,8 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No cash gifts recorded yet. Import a spreadsheet or add amounts after
-          guests are on this event.
+          No cash gifts recorded yet. Use the form above to add shagun for a
+          guest, or import a spreadsheet.
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden">
