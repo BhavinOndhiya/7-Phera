@@ -17,10 +17,7 @@ export function RSVPTracker({ guests }: { guests: Guest[] }) {
 
   const items = [
     {
-      label:
-        stats.parties !== stats.total
-          ? `Total invited (${stats.parties} entries)`
-          : 'Total invited',
+      label: 'Total guests',
       value: stats.total,
       icon: Users,
       color: 'text-foreground',

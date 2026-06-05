@@ -62,27 +62,28 @@ export default async function EventDetailPage({
 
   if (!event) notFound();
 
-  const [budgetResult, eventGuestsResult, tasksResult] = await Promise.all([
+  const [budgetResult, tasksResult] = await Promise.all([
     supabase.from('budget_items').select('*').eq('event_id', event.id),
-    supabase
-      .from('event_guests')
-      .select('guest_id')
-      .eq('event_id', event.id),
     supabase.from('tasks').select('id, status').eq('event_id', event.id),
   ]);
 
   const budgetItems = budgetResult.data ?? [];
   const budgetSummary = calculateBudgetSummary(budgetItems);
 
-  const guestIds = (eventGuestsResult.data ?? []).map((g) => g.guest_id);
-  const { data: guestsForEvent } =
-    guestIds.length > 0
-      ? await supabase
-          .from('guests')
-          .select('rsvp_status')
-          .in('id', guestIds)
-      : { data: [] as { rsvp_status: string }[] };
-  const rsvpStats = calculateRsvpStats(guestsForEvent ?? []);
+  const { data: eventGuestRows } = await supabase
+    .from('event_guests')
+    .select('rsvp_status, guest:guests(party_size)')
+    .eq('event_id', event.id);
+
+  const rsvpStats = calculateRsvpStats(
+    (eventGuestRows ?? []).map((row) => {
+      const guest = Array.isArray(row.guest) ? row.guest[0] : row.guest;
+      return {
+        rsvp_status: row.rsvp_status ?? 'pending',
+        party_size: guest?.party_size ?? 1,
+      };
+    })
+  );
 
   const tasks = tasksResult.data ?? [];
   const completedTasks = tasks.filter((t) => t.status === 'completed').length;

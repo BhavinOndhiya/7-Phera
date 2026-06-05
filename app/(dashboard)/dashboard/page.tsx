@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatINRShort, formatDate, daysUntil } from '@/lib/utils/formatting';
-import { calculateBudgetSummary } from '@/lib/utils/calculations';
+import { calculateBudgetSummary, calculateRsvpStats } from '@/lib/utils/calculations';
 import type { Event, Task, BudgetItem } from '@/lib/types/database.types';
 
 export const metadata: Metadata = { title: 'Dashboard' };
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
         .from('events')
         .select('*')
         .order('event_date', { ascending: true }),
-      supabase.from('guests').select('id, rsvp_status'),
+      supabase.from('guests').select('rsvp_status, party_size'),
       supabase.from('budget_items').select('*'),
       supabase
         .from('tasks')
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
   const vendors = vendorsResult.data ?? [];
 
   const summary = calculateBudgetSummary(budgetItems);
-  const acceptedGuests = guests.filter((g) => g.rsvp_status === 'accepted').length;
+  const guestStats = calculateRsvpStats(guests);
 
   const upcomingEvents = events.filter((e) => new Date(e.event_date) >= new Date());
   const nextEvent = upcomingEvents[0];
@@ -93,9 +93,9 @@ export default async function DashboardPage() {
         />
         <StatsCard
           title="Guests"
-          value={guests.length}
+          value={guestStats.total}
           icon={Users}
-          description={`${acceptedGuests} confirmed`}
+          description={`${guestStats.accepted} confirmed`}
           accent="gold"
         />
         <StatsCard
