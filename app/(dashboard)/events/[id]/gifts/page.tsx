@@ -26,9 +26,6 @@ export default function GiftsPage({
         <h1 className="font-serif text-3xl md:text-4xl font-semibold">
           Gifts received {event ? `· ${event.name}` : ''}
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Record cash / shagun / cover received from each guest.
-        </p>
       </div>
 
       <GuestCashGifts eventId={resolved.id} />

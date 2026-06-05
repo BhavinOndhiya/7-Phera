@@ -7,7 +7,6 @@ import {
   Upload,
   Loader2,
   FileText,
-  Info,
   IndianRupee,
   Trash2,
   Plus,
@@ -367,16 +366,6 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-950">
-        <Info className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
-        <p>
-          Record shagun / cash gifts from each guest for your memory. Add one at a
-          time below, or import a spreadsheet with{' '}
-          <span className="font-mono">full_name</span> and{' '}
-          <span className="font-mono">amount_inr</span> columns.
-        </p>
-      </div>
-
       {canEdit && guests.length > 0 && (
         <div className="rounded-lg border bg-card p-4 space-y-4">
           <h3 className="font-medium text-sm">Add shagun</h3>
@@ -506,12 +495,6 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
         </div>
       )}
 
-      {canEdit && guests.length === 0 && (
-        <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-4 text-center">
-          Add guests to this event first, then record shagun amounts here.
-        </p>
-      )}
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">
@@ -544,12 +527,7 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No cash gifts recorded yet. Use the form above to add shagun for a
-          guest, or import a spreadsheet.
-        </div>
-      ) : (
+      ) : rows.length === 0 ? null : (
         <div className="rounded-lg border overflow-hidden">
           <Table>
             <TableHeader>
@@ -601,13 +579,6 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
             </TableBody>
           </Table>
         </div>
-      )}
-
-      {guests.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {guests.length - contributedGuestIds.size} guests on this event have no
-          amount recorded yet.
-        </p>
       )}
 
       <Dialog open={importOpen} onOpenChange={setImportOpen}>

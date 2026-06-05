@@ -36,9 +36,6 @@ export default function AllGiftsPage() {
         <h1 className="font-serif text-3xl md:text-4xl font-semibold">
           Gifts received
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Pick an event to record cash gifts received.
-        </p>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {events.map((event) => (
