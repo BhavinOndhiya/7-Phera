@@ -121,7 +121,7 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
   const ws = useOptionalWorkspace();
   const workspaceId = ws?.activeWorkspaceId ?? null;
   const canEdit = ws?.can('edit_guest') ?? false;
-  const { guests } = useGuests({ eventId });
+  const { guests } = useGuests();
   const {
     rows,
     loading,
@@ -351,7 +351,7 @@ export function GuestCashGifts({ eventId }: { eventId: string }) {
       }
       if (skippedNoGuest > 0) {
         parts.push(
-          `${skippedNoGuest} skipped (guest not on this event — add them to the guest list first)`
+          `${skippedNoGuest} skipped (name not found in your guest list)`
         );
       }
       if (skippedInvalid > 0) {
