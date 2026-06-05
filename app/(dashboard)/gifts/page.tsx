@@ -14,12 +14,12 @@ export default function AllGiftsPage() {
     return (
       <div className="space-y-6">
         <h1 className="font-serif text-3xl md:text-4xl font-semibold">
-          Gift registry
+          Gifts received
         </h1>
         <EmptyState
           icon={Gift}
           title="No events yet"
-          description="Gift registries are organised per event."
+          description="Cash gifts are organised per event."
           action={
             <Button asChild className="bg-rose-500 hover:bg-rose-600">
               <Link href="/events/new">Create event</Link>
@@ -34,10 +34,10 @@ export default function AllGiftsPage() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="font-serif text-3xl md:text-4xl font-semibold">
-          Gift registry
+          Gifts received
         </h1>
         <p className="text-muted-foreground mt-1">
-          Pick an event to view its gift list.
+          Pick an event to record cash gifts received.
         </p>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">

@@ -1,12 +1,8 @@
 'use client';
 
 import { GuestTable } from '@/components/guests/GuestTable';
-import { RSVPTracker } from '@/components/guests/RSVPTracker';
-import { useGuests } from '@/lib/hooks/useGuests';
 
 export default function AllGuestsPage() {
-  const { guests } = useGuests();
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -15,8 +11,6 @@ export default function AllGuestsPage() {
           Manage your entire guest list across all events.
         </p>
       </div>
-
-      <RSVPTracker guests={guests} />
 
       <GuestTable />
     </div>

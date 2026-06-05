@@ -151,7 +151,7 @@ export default async function EventDetailPage({
       href: `/events/${event.id}/gifts`,
       label: 'Gifts',
       icon: Gift,
-      desc: 'Wishlist & claims',
+      desc: 'Cash & cover received',
       accent: 'bg-indigo-100 text-indigo-700',
     },
     {

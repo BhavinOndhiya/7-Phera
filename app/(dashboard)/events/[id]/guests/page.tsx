@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { ArrowLeft, FileDown, ScanLine, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GuestTable } from '@/components/guests/GuestTable';
-import { RSVPTracker } from '@/components/guests/RSVPTracker';
-import { AttendanceTracker } from '@/components/guests/AttendanceTracker';
 import { InvitationActions } from '@/components/guests/InvitationActions';
 import { useGuests } from '@/lib/hooks/useGuests';
 import { useEvent } from '@/lib/hooks/useEvents';
@@ -19,7 +17,7 @@ export default function EventGuestsPage({
   const resolvedParams =
     params instanceof Promise ? use(params) : params;
   const { event } = useEvent(resolvedParams.id);
-  const { guests, attendance } = useGuests({ eventId: resolvedParams.id });
+  const { guests } = useGuests({ eventId: resolvedParams.id });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -67,10 +65,11 @@ export default function EventGuestsPage({
         </div>
       </div>
 
-      <RSVPTracker guests={guests} />
-      <AttendanceTracker guests={guests} attendance={attendance} />
-
-      <GuestTable eventId={resolvedParams.id} eventName={event?.name} />
+      <GuestTable
+        eventId={resolvedParams.id}
+        eventName={event?.name}
+        showAttendanceTracker
+      />
     </div>
   );
 }

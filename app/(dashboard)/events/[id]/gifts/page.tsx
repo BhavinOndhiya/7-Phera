@@ -4,9 +4,7 @@ import { use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { GiftList } from '@/components/gifts/GiftList';
 import { GuestCashGifts } from '@/components/gifts/GuestCashGifts';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEvent } from '@/lib/hooks/useEvents';
 
 export default function GiftsPage({
@@ -26,36 +24,14 @@ export default function GiftsPage({
           </Link>
         </Button>
         <h1 className="font-serif text-3xl md:text-4xl font-semibold">
-          Gift registry {event ? `· ${event.name}` : ''}
+          Gifts received {event ? `· ${event.name}` : ''}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Wishlist for guests, or record cash / shagun received per guest.
+          Record cash / shagun / cover received from each guest.
         </p>
       </div>
 
-      <Tabs defaultValue="registry" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="registry">Gift registry</TabsTrigger>
-          <TabsTrigger value="cash">Cash gifts (₹)</TabsTrigger>
-        </TabsList>
-        <TabsContent value="registry" className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Public wishlist link:{' '}
-            <a
-              href={`/registry/${resolved.id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-rose-600 hover:underline"
-            >
-              /registry/{resolved.id.slice(0, 8)}…
-            </a>
-          </p>
-          <GiftList eventId={resolved.id} />
-        </TabsContent>
-        <TabsContent value="cash">
-          <GuestCashGifts eventId={resolved.id} />
-        </TabsContent>
-      </Tabs>
+      <GuestCashGifts eventId={resolved.id} />
     </div>
   );
 }

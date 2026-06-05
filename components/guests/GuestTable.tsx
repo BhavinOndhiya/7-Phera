@@ -65,6 +65,8 @@ import { emitDataChanged } from '@/lib/utils/dataEvents';
 import { RSVP_STATUSES, SIDES } from '@/lib/constants';
 import type { Guest, Side, RsvpStatus } from '@/lib/types/database.types';
 import { GuestImport } from './GuestImport';
+import { RSVPTracker } from './RSVPTracker';
+import { AttendanceTracker } from './AttendanceTracker';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { exportGuestsToXlsx } from '@/lib/utils/exportGuests';
 
@@ -72,9 +74,17 @@ interface GuestTableProps {
   eventId?: string;
   eventName?: string;
   hideTitle?: boolean;
+  showRsvpTracker?: boolean;
+  showAttendanceTracker?: boolean;
 }
 
-export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
+export function GuestTable({
+  eventId,
+  eventName,
+  hideTitle,
+  showRsvpTracker = true,
+  showAttendanceTracker = false,
+}: GuestTableProps) {
   const {
     guests,
     guestEvents,
@@ -328,8 +338,28 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
   const columnCount =
     (showEventsColumn ? 7 : 6) + (showCheckinColumn ? 1 : 0) + 1;
 
+  const isFiltered =
+    Boolean(search) ||
+    sideFilter !== 'all' ||
+    relationFilter !== 'all' ||
+    rsvpFilter !== 'all' ||
+    checkinFilter !== 'all' ||
+    eventFilter !== 'all';
+
   return (
     <div className="space-y-4">
+      {showRsvpTracker && (
+        <div className="space-y-1">
+          {isFiltered && (
+            <p className="text-xs text-muted-foreground">Showing filtered counts</p>
+          )}
+          <RSVPTracker guests={filtered} />
+        </div>
+      )}
+      {showAttendanceTracker && eventId && (
+        <AttendanceTracker guests={filtered} attendance={attendance} />
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         {!hideTitle && (
           <div>
@@ -337,11 +367,11 @@ export function GuestTable({ eventId, eventName, hideTitle }: GuestTableProps) {
               {filtered.length} of {guests.length} entries
             </h2>
             {(() => {
-              const totalPeople = guests.reduce(
+              const totalPeople = filtered.reduce(
                 (s, g) => s + Math.max(1, g.party_size ?? 1),
                 0
               );
-              const families = guests.filter(
+              const families = filtered.filter(
                 (g) => (g.party_size ?? 1) > 1
               ).length;
               return (

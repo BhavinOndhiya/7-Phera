@@ -615,48 +615,6 @@ export type Database = {
         };
         Relationships: [];
       };
-      gifts: {
-        Row: {
-          id: string;
-          event_id: string;
-          name: string;
-          description: string | null;
-          price: number | null;
-          url: string | null;
-          image_url: string | null;
-          claimed_by: string | null;
-          claimed_at: string | null;
-          workspace_id: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          event_id: string;
-          name: string;
-          description?: string | null;
-          price?: number | null;
-          url?: string | null;
-          image_url?: string | null;
-          claimed_by?: string | null;
-          claimed_at?: string | null;
-          workspace_id?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          event_id?: string;
-          name?: string;
-          description?: string | null;
-          price?: number | null;
-          url?: string | null;
-          image_url?: string | null;
-          claimed_by?: string | null;
-          claimed_at?: string | null;
-          workspace_id?: string | null;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
       guest_contributions: {
         Row: {
           id: string;
@@ -871,7 +829,6 @@ export type TaskReminderSent = Tables<'task_reminder_sent'>;
 export type DocumentRow = Tables<'documents'>;
 export type TimelineItem = Tables<'timeline_items'>;
 export type VendorReview = Tables<'vendor_reviews'>;
-export type Gift = Tables<'gifts'>;
 export type GuestContribution = Tables<'guest_contributions'>;
 export type EventCollaborator = Tables<'event_collaborators'>;
 export type Workspace = Tables<'workspaces'>;
